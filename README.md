@@ -1,20 +1,17 @@
 # Verso Cast
 
-Genre-agnostic rendering of `Verso.Doc.Part genre` as native React nodes through
-VIR. Clients supply their own extension renderers. Cast adds no Blueprint
-dependency, alternative document model, editor protocol or runtime.
+Render `Verso.Doc.Part genre` as native React nodes through VIR, with client-owned
+inline, block and section extensions. The same renderer supports live React and
+offline HTML through React SSR.
 
-Experimental, local-only source checkpoint. Lean **4.35.0-rc4** and exact
-Verso/VIR revisions are pinned in `lakefile.lean` and `lake-manifest.json`.
-The npm package remains private; no registry release has been made.
+Experimental. Requires Lean **4.35.0-rc4**; exact Verso and VIR revisions are
+pinned in `lakefile.lean` and `lake-manifest.json`.
 
 ## Build and use
 
 ```sh
 lake build
 ```
-
-Consumers import `VersoCast`:
 
 ```lean
 import VersoCast
@@ -27,18 +24,16 @@ def renderDocument (styles : VersoCast.Renderer.Styles)
 
 Create `Renderer.Styles.create` once in the component factory. Styles are
 read-only native values; each render constructs fresh props. Basic rendering
-needs no JSON, equality or hashing instances. Use `Renderer.Renderers genre`
-for inline/block/metadata extensions. For Manual, explicitly import
-`VersoCast.Manual`; it is not part of the core import.
+needs no JSON, equality or hashing instances. Supply `Renderer.Renderers genre`
+for inline/block/metadata extensions. The opt-in Manual adapter is available
+through `import VersoCast.Manual`.
 
-The renderer returns a subtree, not a React root or a widget. Stateful
-extensions return stable ordinary React components; extension callbacks
-themselves are not hook scopes. See the [rendering guide](doc/RENDERING.md) for
-identities, lazy children, attributes, focus and change highlighting.
+The renderer returns a subtree. Stateful extensions use stable ordinary React
+components; extension callbacks themselves are not hook scopes. See the
+[rendering guide](doc/RENDERING.md) for lazy children, identities, attributes,
+focus and change highlighting.
 
 ## Optional math
-
-The optional JS entry point supplies one shared live/offline React leaf:
 
 ```js
 import katex from "katex";
@@ -48,26 +43,26 @@ import { createMathComponent } from "verso-cast/katex";
 const MathFormula = createMathComponent(katex); // once, outside render
 ```
 
-Pass it as `Renderer.Renderers.mathComponent?` on the Lean side. Clients own
-KaTeX, CSS/fonts and formula/prelude preparation. The Lean library does not
-require npm or KaTeX. [Math contract and demo](doc/RENDERING.md#optional-math-leaf).
+Pass it as `Renderer.Renderers.mathComponent?` on the Lean side. Clients supply
+KaTeX, CSS/fonts and any formula preparation. The core Lean build needs neither
+npm nor KaTeX. [Math API and demo](doc/RENDERING.md#optional-math-leaf).
 
-## Try and test
-
-From a source checkout:
+## Demos and tests
 
 ```sh
 lake build VersoCast VersoCastTests cast-assets cast-standard-html
 lake test
 npm ci
+npx playwright install chromium
 lake build VersoCastExamples
 npm test
 npm run demo
 ```
 
-`demo` prints a loopback URL. The [development guide](doc/DEVELOPMENT.md)
-covers the small VS Code widget, the three-way Verso/live React/offline
-comparison, individual test commands, runtime assets and qualification limits.
+`demo` prints a local URL. For VS Code, open
+[VersoCastShowcase.lean](examples/VersoCastShowcase.lean) and place the cursor
+inside `showcase_ready`. The [development guide](doc/DEVELOPMENT.md) covers
+runtime assets, individual tests and the three-way HTML comparison.
 
 ## Source map
 
@@ -76,27 +71,20 @@ comparison, individual test commands, runtime assets and qualification limits.
 | `VersoCast/Renderer.lean` | Identity/change helpers and document traversal |
 | `VersoCast/Renderer/Config.lean` | Extension hooks, attributes and render options |
 | `VersoCast/Renderer/Style.lean` | Factory-owned native styles |
-| `VersoCast/Fingerprint.lean` | Optional pure retained identity state |
-| `VersoCast/Manual.lean` | Opt-in Manual adapter |
-| `js/katex.mjs` | Optional JS library leaf; exported as `verso-cast/katex` |
-| `examples/` | Small Lean widget and standalone browser example |
-| `tests/` | Lean, SSR and Chromium fixtures; browser entries in `tests/browser/` |
-| `tools/` | Development-only staging, serving and browser bootstrap |
+| `VersoCast/Fingerprint.lean` | Optional retained identity state |
+| `VersoCast/RenderPath.lean` | Navigation addresses |
+| `VersoCast/JsStrings.lean` | Cached native strings |
+| `VersoCast/Manual.lean` | Manual adapter |
+| `js/katex.mjs` | Optional math leaf |
+| `examples/`, `tests/`, `tools/` | Demos, tests and development tooling |
 
-`import VersoCast` continues to expose the renderer and its configuration/style
-names. The file split introduces no new runtime layer. Fixed native strings
-remain in `JsStrings.lean`; navigation addresses remain in `RenderPath.lean`.
+## Scope
 
-## Integration status
+Clients prepare documents, resolve genre-specific references and numbering, and
+provide their editor or widget integration. Cast does not elaborate documents
+or run Verso traversal.
 
-Generic rendering, extension contracts, live state/DOM retention, focus and
-optional KaTeX have local SSR/browser coverage. Blueprint semantics and its
-consumer parity remain VBP-owned: see the
-[consumer migration guide](doc/CONSUMER_MIGRATION.md). Codec/FIR/editor-shell
-qualification is separate. The full renderer's native Lean C precompilation is
-not qualified; offline HTML currently uses React SSR through VIR.
+Renderer execution, including SSR, uses VIR. Native Lean C precompilation of
+the renderer is unsupported at the pinned VIR revision.
 
-[Extraction provenance](ORIGIN.md) records the source and deliberate changes.
-The CI workflow builds from a fresh checkout without restored build caches,
-checks a separate consumer, and runs the SSR/Chromium suite. Remote CI and
-Blueprint consumer review must pass before publication; no release is automated.
+[Attribution and license](ORIGIN.md).

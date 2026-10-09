@@ -45,7 +45,6 @@ structure Values where
   cursor : Js String
   structural : Js String
   explicit : Js String
-  verso : Js String
   fingerprint : Js String
   positional : Js String
   mathInlineClass : Js String
@@ -91,7 +90,6 @@ private def createValues : RuntimeM Values := do
     cursor := ← JsValue.ofString "cursor"
     structural := ← JsValue.ofString "structural"
     explicit := ← JsValue.ofString "explicit"
-    verso := ← JsValue.ofString "verso"
     fingerprint := ← JsValue.ofString "fingerprint"
     positional := ← JsValue.ofString "positional"
     mathInlineClass := ← JsValue.ofString "vir-verso-math inline"

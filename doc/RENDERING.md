@@ -67,7 +67,7 @@ Basic rendering requires no JSON, equality or hash instances and uses positional
 keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
 `Renderers.fingerprint` optionally supplies content identities. For Manual,
 import `VersoCast.Manual` and extend `Manual.renderers`; this adapter preserves
-named placeholders and the previous stateless serialized-content key policy.
+named placeholders and a stateless serialized-content key policy.
 The core `VersoCast` import does not import Manual.
 
 For retained documents, keep `Fingerprint.State genre` in component state and
@@ -128,10 +128,14 @@ extension dispatch adds O(1) work per visited extension, excluding its renderer,
 child rendering and any opt-in content identity policy. These are structural
 cost claims, not measured latency results.
 
-The [separate consumer](../tests/downstream/Consumer.lean) compiles all three
-extension hooks, heading customization and root attributes through
-`import VersoCast` alone, for an arbitrary genre without additional instances.
-It is an import/API check, not a second renderer or widget implementation.
+## Client-owned semantics
+
+Clients supply prepared documents and interpret their own extension data,
+including labels, resolved references, numbering and external markup. Use the
+block hook's attributes and lazy children for custom statements, callouts or
+source/summary views; hiding an extension should skip its children entirely.
+Define malformed-data and unsupported-extension output in the client adapter.
+Cast's fallback is a visible placeholder, not a genre-specific error policy.
 
 ## Optional math leaf
 
@@ -167,9 +171,7 @@ component; it is intentionally static. Ctrl-C stops the server.
 
 ## Execution backends
 
-The React renderer executes through VIR, including for Node SSR; it is not a
-native Lean HTML generator. Native C
-compilation of the renderer currently reaches VIR host marker externs such as
-`__vir_js:react.node.createElement`, which are invalid C identifiers in this
-producer. The standalone Lean import succeeds; native precompilation of that
-whole import is not qualified. No consumer-side stubs or marker rewrite is added.
+The React renderer executes through VIR, including for Node SSR. Native Lean C
+precompilation of the renderer is unsupported at the pinned VIR revision:
+its JavaScript host externs cannot be compiled as native C functions.
+The pure `VersoCast.Fingerprint` helpers support native execution.

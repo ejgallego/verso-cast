@@ -33,7 +33,6 @@ private def applyAttributes (props : Js Props) (attributes : Array Attribute) : 
 private inductive IdentityOrigin where
   | structural
   | explicit
-  | verso
   | fingerprint
   | positional
   deriving BEq, Inhabited
@@ -41,14 +40,12 @@ private inductive IdentityOrigin where
 private def IdentityOrigin.label : IdentityOrigin → String
   | .structural => "structural"
   | .explicit => "explicit"
-  | .verso => "verso"
   | .fingerprint => "fingerprint"
   | .positional => "positional"
 
 private def IdentityOrigin.jsLabel (strings : JsStrings.Fixed) : IdentityOrigin → Js String
   | .structural => strings.values.structural
   | .explicit => strings.values.explicit
-  | .verso => strings.values.verso
   | .fingerprint => strings.values.fingerprint
   | .positional => strings.values.positional
 
@@ -59,7 +56,6 @@ identities where the application owns their meaning.
 -/
 private structure IdentityHints where
   explicitId? : Option String := none
-  versoId? : Option String := none
   fingerprint? : Option String := none
   deriving Inhabited
 
@@ -81,18 +77,16 @@ private def fingerprintFriendlyId (value : String) : String :=
 
 private def IdentityHints.resolve
     (kind : String) (index : Nat) (debugPath : String) (hints : IdentityHints) : IdentityBase :=
-  match hints.explicitId?, hints.versoId?, hints.fingerprint? with
-  | some value, _, _ =>
+  match hints.explicitId?, hints.fingerprint? with
+  | some value, _ =>
       { reactKey := s!"explicit:{value}", friendlyId := value, origin := .explicit }
-  | none, some value, _ =>
-      { reactKey := s!"verso:{value}", friendlyId := value, origin := .verso }
-  | none, none, some value =>
+  | none, some value =>
       -- The full canonical value stays in the React key. The short hash is
       -- human-facing only, so collisions cannot alias siblings.
       { reactKey := s!"fingerprint:{kind}:{value.length}:{value}"
         friendlyId := fingerprintFriendlyId value
         origin := .fingerprint }
-  | none, none, none =>
+  | none, none =>
       { reactKey := s!"position:{kind}:{index}", friendlyId := debugPath, origin := .positional }
 
 private def allocateSiblingIdentities
@@ -601,18 +595,12 @@ def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})
 #guard
   let explicit := ({
     explicitId? := some "author"
-    versoId? := some "verso"
-    fingerprint? := some "content"
-  } : IdentityHints).resolve "block" 0 "part-root-block-0"
-  let verso := ({
-    versoId? := some "verso"
     fingerprint? := some "content"
   } : IdentityHints).resolve "block" 0 "part-root-block-0"
   let fingerprint := ({ fingerprint? := some "content" } : IdentityHints).resolve
     "block" 0 "part-root-block-0"
   let positional := ({} : IdentityHints).resolve "block" 0 "part-root-block-0"
   explicit.origin == .explicit && explicit.reactKey == "explicit:author" &&
-  verso.origin == .verso && verso.reactKey == "verso:verso" &&
   fingerprint.origin == .fingerprint && positional.origin == .positional
 
 #guard
