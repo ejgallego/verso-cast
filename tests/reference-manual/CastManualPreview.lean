@@ -2,6 +2,7 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Manual
+public import CastManualPreview.Extensions
 public import Vir.Infoview
 public import Vir.Infoview.Widget
 public meta import Vir.Infoview.Widget
@@ -26,6 +27,7 @@ private structure Response where
 -- A single child type and stable inputs keep ordinary React state across edits.
 private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
   let styles ← VersoCast.Renderer.Styles.create
+  let renderers ← Extensions.create styles
   FunctionComponent.ofLean fun props => do
     let input : Input ← LeanRef.fromJSL (← Props.WithData.data props)
     let initializer ← Js.Function.ofLean0 (LeanRef.toJSL ({} : Response))
@@ -83,7 +85,7 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
       | none => Js.Nullable.null
       | some doc => do
           Js.Nullable.ofJs (← VersoCast.Renderer.render styles doc
-          (renderers := VersoCast.Manual.renderers))
+          (renderers := renderers))
     return ← <section>
       <p role="status">{Lean.Vir.ProofWidgets.Html.text state.status}</p>
       {rendered}

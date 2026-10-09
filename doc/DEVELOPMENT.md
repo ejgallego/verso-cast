@@ -40,6 +40,7 @@ Each npm test below can be run with `npm run <name>`.
 | `test:navigation` | Focus addresses, fragments, description lists and independent change markers |
 | `test:widget`, `test:showcase` | Live component state, callbacks, retained DOM and disposal |
 | `test:math` | KaTeX SSR/live output, updates, malformed input and macro isolation |
+| `test:manual` | Lean source/output, severity, summaries, escaping and fallback |
 
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
@@ -111,8 +112,11 @@ Do not build that copy and Cast concurrently: their dependencies are shared.
 Existing legacy pages may emit a missing-`module` warning; they are not migrated.
 
 This is a raw-document validation mode, not the generated reference website:
-it does not run Manual traversal, resolve references, reproduce its extension
-renderers, or typeset math. Unsupported extensions have visible named
+it does not run Manual traversal, resolve references or typeset math. Built-in
+Lean code/output render as text panels; the consumer adds proof-state panels
+and collapsible examples. Example summaries use their plain-text description;
+rich summary markup, syntax colouring and hover information are not implemented.
+Unsupported extensions have visible named
 placeholders. The test-only transport uses `ToJson`/`FromJson` and Lean's JSON
 parser, not an optimized codec; its latency is not a renderer benchmark.
 

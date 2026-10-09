@@ -12,6 +12,7 @@ public import VersoCastTests.Fingerprint
 public import VersoCastTests.Offline
 public import VersoCastTests.Retention
 public import VersoCastTests.Math
+public import VersoCastTests.Manual
 public import VersoCastTests.Navigation
 public import VersoCastTests.Changes
 meta import VersoCast.Renderer

@@ -8,7 +8,8 @@ export const manualRevision = "349244b4dd2f284728c1dacb621cc74a32f9929b";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const destination = resolve(root, ".local/reference-manual");
 const fixtures = resolve(root, "tests/reference-manual");
-const sources = ["CastManualPreview.lean", "CastManualPreview/Server.lean", "ExportPages.lean"];
+const sources = ["CastManualPreview.lean", "CastManualPreview/Server.lean",
+  "CastManualPreview/Extensions.lean", "ExportPages.lean"];
 const hash = source => createHash("sha256").update(source).digest("hex");
 const run = (cwd, command, args, capture = false) => execFileSync(command, args, {
   cwd, encoding: "utf8", stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",

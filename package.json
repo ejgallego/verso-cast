@@ -12,7 +12,8 @@
     "react": "^19.2.7"
   },
   "scripts": {
-    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math",
+    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math && npm run test:manual",
+    "test:manual": "node tests/manual-acceptance.mjs",
     "test:showcase": "node tests/showcase-browser.mjs",
     "test:reference-setup": "node --test tests/reference-manual/setup.test.mjs",
     "test:renderer": "node tests/render-acceptance.mjs",

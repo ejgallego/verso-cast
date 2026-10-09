@@ -38,6 +38,16 @@ try {
     throw error;
   }
   await page.getByText("Typographical Conventions", { exact: true }).first().waitFor();
+  for (const name of ["Verso.Genre.Manual.InlineLean.Block.lean",
+    "Verso.Genre.Manual.InlineLean.Block.leanOutput", "Manual.proofState", "Manual.example"])
+    assert.equal((await page.locator("#app").textContent()).includes(`[block extension: ${name}]`), false, name);
+  assert.ok(await page.locator('pre[data-verso-kind="lean"]').count());
+  assert.ok(await page.locator('pre[data-verso-kind="proof-state"]').count());
+  const example = page.locator('details[data-verso-kind="example"]').first();
+  assert.equal(await example.evaluate(node => node.open), false);
+  await example.locator("summary").click();
+  assert.equal(await example.evaluate(node => node.open), true);
+  await example.getByText("This is an example of an example.", { exact: true }).waitFor();
   await page.evaluate(() => { window.firstHeading = document.querySelector("article h1"); });
   const calls = await page.evaluate(() => window.manualPreview.calls);
   await page.evaluate(() => window.manualPreview.render());
@@ -50,6 +60,7 @@ try {
   await page.waitForFunction(expected => window.manualPreview.calls > expected, calls);
   await heading("Introduction").waitFor();
   assert.equal(await page.evaluate(() => window.firstHeading === document.querySelector("article h1")), true);
+  assert.equal(await example.evaluate(node => node.open), true, "example disclosure survives a refresh");
   await page.evaluate(() => window.manualPreview.malformed(true));
   await page.getByRole("status").filter({ hasText: "Invalid manual preview:" }).waitFor();
   await heading("Introduction").waitFor();

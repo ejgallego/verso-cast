@@ -68,6 +68,14 @@ keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
 `Renderers.fingerprint` optionally supplies content identities. For Manual,
 import `VersoCast.Manual` and extend `Manual.renderers`; this adapter preserves
 named placeholders and a stateless serialized-content key policy.
+For readable built-in Lean blocks and compiler output, call
+`Manual.createRenderers styles` once in the component factory and pass the
+result to `Renderer.render`. It preserves source text, message severity,
+summary flags and trace-expansion settings. This initial mode has no syntax
+colouring or interactive hover information. Malformed data and unknown
+extensions keep the named fallback. Reference-manual-specific extensions
+(`Manual.example`, `Manual.proofState`) are implemented by the validation
+consumer, not registered globally in Cast.
 The core `VersoCast` import does not import Manual.
 
 Semantic block labels are opaque strings; separators and Unicode are allowed.
