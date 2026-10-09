@@ -72,6 +72,16 @@ and resolves hash collisions with exact equality. React keys are sibling-local;
 navigation paths are separate.
 Cursor/control changes need not recompute content identities.
 
+`Options.focus` is a source-navigation address, not a React key or DOM ID.
+It adds a visual marker without moving keyboard focus or scrolling. Ordinary
+block/heading and list-item addresses select their matching nodes. A fragment
+has no DOM wrapper, so it marks its visible child roots (through nested
+fragments). A description-item address selects both term and value; the exposed
+`-term` and `-description` addresses select those separately. Hidden, empty or
+missing addresses do not fall back to another node. Focus and change markers
+are independent. Editor selection, cursor tracking and scroll policy remain
+with the client.
+
 Pass a current-document state's key function only in `Options.fingerprint?`.
 The `changedBlockIds*` helpers compare both documents using the stateless
 `Renderers.fingerprint` policy; a state prepared only for the new document may
@@ -111,6 +121,7 @@ npm run test:widget
 npm run test:identity
 npm run test:offline
 npm run test:math
+npm run test:navigation
 ```
 
 Run the Lean build before `npm ci`: the local npm dependency points to Lake's
@@ -142,7 +153,7 @@ inline footnotes instead of a block `details` element inside a paragraph.
 | Extension replacement, fallback, hidden children | Inherited callbacks plus counted generic-genre dispatch and lazy-child checks |
 | Identity collisions, duplicate contents, retirement | Pure typed-state tests and inherited key assertions |
 | State through document edits | `test:identity`: live insertion, reorder, body edit, removal/reinsertion, duplicate semantic IDs; ordinary DOM retention and disposal |
-| Focus/change diagnostics | Inherited path/key and fragment-focus checks; editor selection/follow-cursor acceptance remains with VBP |
+| Focus/change diagnostics | `test:navigation`: SSR/Chromium exact block/heading/list paths, fragment propagation, description halves/shared item, hidden/missing paths, marker clearing, independent changes and retained DOM. Editor selection/follow-cursor acceptance remains with VBP |
 | Math typesetting | `test:math`: shared KaTeX leaf through the Lean document path in SSR/Chromium; source/mode updates, malformed recovery, escaping, macro isolation, retained DOM and disposal. Offline output is no longer empty |
 | Blueprint informal blocks, external markup, math preludes | VBP-owned adapter and consumer parity gates; not inferred from Manual tests |
 | Transport, codecs, FIR backend, editor shell | Separate owner-held integration gates; no private decoder or copied provider adopted here |

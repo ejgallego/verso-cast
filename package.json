@@ -10,6 +10,7 @@
     "test:identity": "node tests/identity-browser.mjs",
     "test:offline": "node tests/offline-comparison.mjs",
     "test:math": "node tests/math-acceptance.mjs",
+    "test:navigation": "node tests/navigation-acceptance.mjs",
     "compare": "node tests/offline-comparison.mjs",
     "compare:serve": "node tools/compare.mjs",
     "demo": "node tools/demo.mjs"

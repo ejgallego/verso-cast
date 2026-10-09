@@ -640,11 +640,17 @@ where
         (_root_.Verso.Doc.Inline g) (_root_.Verso.Doc.Block g)) :
       ReactM (Array (Lean.Vir.Js Node)) := do
     let .mk term description := item
-    let termProps ← listItemProps styles s!"{key}:term" s!"{path}-term" "description-term" (styles.descriptionTerm) (focus == some path)
+    let termPath := s!"{path}-term"
+    let descriptionPath := s!"{path}-description"
+    -- The shared item address selects both halves. Each exposed DOM address
+    -- also selects its own half, just like ordinary block/list-item addresses.
+    let termProps ← listItemProps styles s!"{key}:term" termPath "description-term" (styles.descriptionTerm)
+      (focus == some path || focus == some termPath)
     let termChildren ← renderInlines styles renderers term
     let termNode ← <dt @props={termProps}>{Js.Array.ofArray termChildren}</dt>
-    let descriptionProps ← listItemProps styles s!"{key}:description" s!"{path}-description" "description-value" (styles.descriptionValue) (focus == some path)
-    let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}/description" s!"{path}-description" description
+    let descriptionProps ← listItemProps styles s!"{key}:description" descriptionPath "description-value" (styles.descriptionValue)
+      (focus == some path || focus == some descriptionPath)
+    let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}/description" descriptionPath description
     let descriptionNode ← <dd @props={descriptionProps}>{Js.Array.ofArray descriptionChildren}</dd>
     pure #[termNode, descriptionNode]
 
@@ -697,6 +703,11 @@ private partial def renderPart (styles : Styles) (renderers : Renderers g) (fing
 /-- Options computed by the stateful component before constructing the Verso VDOM. -/
 structure Options (g : Doc.Genre) where
   changedIds : Array String := #[]
+  /-- Source-navigation address, separate from React keys. It marks matching
+  blocks/headings or list items. Fragments mark their visible child roots;
+  a description-item address marks both term and value, whose own addresses
+  select them separately. Hidden/missing addresses do not select a substitute.
+  No DOM focus or scrolling is performed. -/
   focus : Option String := none
   /-- Later attributes override style/class defaults, never mutate their values.
   Cast's diagnostic data attributes are reserved and written last. -/
