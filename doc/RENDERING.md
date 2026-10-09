@@ -32,6 +32,18 @@ It should return the matching hN element. Descendant metadata is preserved.
 Call each child/default callback at most once and return `some` after using it;
 returning `none` delegates to fallback rendering. No memoization or registry
 scan is added to extension handling.
+
+Block callbacks receive `Renderer.BlockChildren`: `children.render ()` renders
+ordinary wrapped blocks. `children.splitParagraph? ()` exposes a leading
+paragraph's fresh attributes/inlines and a separate lazy body, useful for rich
+summaries and captions. `children.listItems? ()` exposes cells of a single
+unordered list as lazy fresh attributes/block contents. Shape inspection renders
+nothing; choose one view and consume each selected child at most once. Source
+addresses and sibling keys retain their original positions, even when wrappers
+are omitted. With positional identities, these views prepare children in linear
+time; opt-in fingerprinting retains its own documented cost.
+The genre-independent `Renderer.Table` helper groups those cells, styles headers
+and emits explicit `thead`/`tbody`; malformed dimensions consume no cells.
 These helpers are not hook scopes: do not call React hooks inside them.
 Inline extensions must return phrasing content. Cast footnotes use inline
 `span`/`sup` markup rather than invalid `details` inside paragraphs.
@@ -84,7 +96,9 @@ For readable built-in Lean blocks and compiler output, call
 result to `Renderer.render`. It preserves source text, message severity,
 summary flags and trace-expansion settings. Native token styles also cover
 inline Lean/names, tactic snippets and Markdown Lean; docstring sections and
-constructor signatures render their stored children. Syntax errors show their
+constructor/internal/field signatures render their stored children. Tables keep
+headers and alignment; file examples label their stored input/output contents.
+Paragraph groups retain block structure. Syntax errors show their
 source and diagnostics. Styles are cached in the factory and use VS Code CSS
 variables with browser fallbacks; token colours approximate semantic categories,
 not the editor's full TextMate theme. Interactive hover information is pending.

@@ -2,6 +2,10 @@
 Author: Emilio J. Gallego Arias -/
 import Manual.Intro
 import Manual.BasicTypes.Empty
+import Manual.BasicTypes.Products
+import Manual.BasicTypes.Int
+import Manual.Monads.Syntax
+import Manual.Language.InductiveTypes.Structures
 import Verso.Doc.Name
 
 -- Exercise the same retained package that the infoview RPC emits, rather than
@@ -23,3 +27,7 @@ def main : IO Unit := do
   IO.FS.createDirAll ".cast-preview"
   IO.FS.writeFile ".cast-preview/intro.json" (Lean.toJson (%doc Manual.Intro)).compress
   IO.FS.writeFile ".cast-preview/empty.json" (Lean.toJson (%doc Manual.BasicTypes.Empty)).compress
+  IO.FS.writeFile ".cast-preview/products.json" (Lean.toJson (%doc Manual.BasicTypes.Products)).compress
+  IO.FS.writeFile ".cast-preview/int.json" (Lean.toJson (%doc Manual.BasicTypes.Int)).compress
+  IO.FS.writeFile ".cast-preview/monads.json" (Lean.toJson (%doc Manual.Monads.Syntax)).compress
+  IO.FS.writeFile ".cast-preview/structures.json" (Lean.toJson (%doc Manual.Language.InductiveTypes.Structures)).compress

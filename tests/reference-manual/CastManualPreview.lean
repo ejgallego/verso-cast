@@ -13,6 +13,7 @@ meta import all CastManualPreview.Extensions
 meta import all VersoCast.Manual
 meta import all VersoCast.Manual.Highlighting
 meta import all VersoCast.Renderer
+meta import all VersoCast.Renderer.Table
 meta import Vir.Attributes
 
 public section
@@ -28,6 +29,9 @@ private structure Input where
 private structure Response where
   document : Option (Verso.Doc.Part Verso.Genre.Manual) := none
   status : String := "Loading page…"
+
+private def decodeDocument (encoded : String) : Except String (Verso.Doc.Part Verso.Genre.Manual) :=
+  Lean.Json.parse encoded >>= Lean.fromJson?
 
 -- Same public RPC/effect pattern as VIR's RpcReferenceWidget tutorial.
 -- A single child type and stable inputs keep ordinary React state across edits.
@@ -71,8 +75,8 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
       let succeed ← Js.Function.ofLeanVoid fun (reply : Js String) => do
         if ← active.get then
           let encoded ← JsValue.toString reply
-          match Lean.Json.parse encoded >>= Lean.fromJson? with
-          | .ok (document : Verso.Doc.Part Verso.Genre.Manual) =>
+          match decodeDocument encoded with
+          | .ok document =>
             Js.Function.callVoid setter (SetStateAction.ofValue (← LeanRef.toJSL {
               document := some document, status := "" : Response }))
           | .error error =>
@@ -113,6 +117,15 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
       </header>
       {rendered}
     </section>
+
+/-- Test-only direct path for React SSR, using the same decoder and renderers as
+the retained widget, without its editor/RPC shell. -/
+@[vir_export] def renderDocument (encoded : String) : ReactM (Js Node) := do
+  match decodeDocument encoded with
+  | .error error => <p role="alert">{ProofWidgets.Html.text error}</p>
+  | .ok document => do
+    let styles ← VersoCast.Renderer.Styles.create
+    VersoCast.Renderer.render styles document (renderers := (← Extensions.create styles))
 
 @[vir_export]
 def View : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do

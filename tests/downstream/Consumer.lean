@@ -23,7 +23,7 @@ public def Consumer.createView {genre : Verso.Doc.Genre}
       return some (← <mark @props={props}>{Js.Array.ofArray (← children ())}</mark>)
     renderBlock? := fun _ attributes _ children => do
       let props ← attributes "consumer-note" styles.unsupported
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children ())}</aside>)
+      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
     renderPart? := fun _ _ _ renderDefault => do
       let header : Renderer.HeaderRenderer := fun level props title => do
         Node.createElement (← ElementType.tag (← JsValue.ofString s!"h{level}"))

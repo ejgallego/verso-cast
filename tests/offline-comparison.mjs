@@ -143,6 +143,9 @@ try {
         lists: collect("ul,ol", e => [e.tagName, e.getAttribute("start"), text(e)]),
         descriptions: collect("dt,dd", e => [e.tagName, text(e)]),
         quotations: collect("blockquote"), footnotes: collect(".vir-verso-footnote,details.footnote"),
+        summaries: collect("details:not(.footnote) > summary"),
+        tables: collect("table", e => [...e.querySelectorAll("tr")].map(row =>
+          [...row.children].map(cell => [cell.tagName, text(cell)]))),
         highlights: collect("mark"), notices: collect("aside"),
         sections: collect("[data-fixture-section]", e => e.getAttribute("data-fixture-section")),
         math: collect("code[data-verso-math-mode],code.math", e => [
@@ -194,12 +197,15 @@ try {
     assert.deepEqual(summary.images, [["fixture.svg", "Fixture image"]]);
     assert.deepEqual(summary.lists, [["UL", null, "Unordereditem"], ["OL", "3", "Ordereditem"]]);
     assert.deepEqual(summary.math, [["inline", "x<y"], ["display", "x^2"]]);
-    assert.deepEqual(summary.emphasis, ["emphasis", "nestedemphasis"]);
+    assert.deepEqual(summary.emphasis, ["emphasis", "nestedemphasis", "summary"]);
     assert.deepEqual(summary.strong, ["strong"]);
     assert.deepEqual(summary.codeBlocks, ["#check Nat\n-- <escaped>"]);
     assert.deepEqual(summary.descriptions, [["DT", "Term"], ["DD", "Definition"]]);
     assert.deepEqual(summary.quotations, ["Quotation"]);
     assert.deepEqual(summary.footnotes, ["[note]Footnotebody"]);
+    assert.deepEqual(summary.summaries, ["Richsummary<title>", "Nestedsummary"]);
+    assert.deepEqual(summary.tables, [[[ ["TH", "Leftheader"], ["TH", "Rightheader"] ],
+      [ ["TD", "Leftcell"], ["TD", "Rightcell"] ]]]);
     assert.deepEqual(summary.highlights, ["Highlightednestedemphasis"]);
     assert.deepEqual(summary.notices, ["NoticechildNestednotice", "Nestednotice"]);
     assert.deepEqual(summary.unsupportedChildren, [true, true]);
@@ -212,12 +218,20 @@ try {
     JSON.stringify({ ...summaries, differingObservations, validity: structures }, null, 2) + "\n");
   await page.locator("#live mark").click();
   await page.locator('#live mark[data-cast-initial="clicked"]').waitFor();
+  const summariesLive = page.locator('#live details[data-verso-kind="summary"]');
+  await summariesLive.first().locator("summary").first().click();
+  await summariesLive.nth(1).locator("summary").click();
+  assert.equal(await summariesLive.evaluateAll(nodes => nodes.every(node => node.open)), true);
+  await page.evaluate(() => { window.retainedSummary = document.querySelector('#live details[data-verso-kind="summary"]'); });
   await page.evaluate(() => { window.retainedMark = document.querySelector("#live mark"); });
   for (let update = 0; update < 20; update++) {
     await page.evaluate(() => window.castComparison.update());
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await page.locator("#live mark").getAttribute("data-cast-initial"), "clicked");
     assert.equal(await page.evaluate(() => window.retainedMark === document.querySelector("#live mark")), true);
+    assert.equal(await page.evaluate(() => window.retainedSummary === document.querySelector('#live details[data-verso-kind="summary"]')), true);
+    assert.equal(await summariesLive.evaluateAll(nodes => nodes.every(node => node.open)), true,
+      "nested disclosure state survives redraws");
   }
   assert.deepEqual(errors, [], "live React reports no nesting/runtime errors");
   console.log(`Offline fixture checks PASS; differing observations: ${differingObservations.join(", ") || "none"}`);

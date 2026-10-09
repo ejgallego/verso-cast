@@ -57,7 +57,7 @@ private structure State where
     renderBlock? := fun _key attributes extension children => do
       let .str label := extension.data | return none
       let props ← Props.WithData.make (← LeanRef.toJSL label)
-      let leaf ← Node.functionComponent counterView props (← Js.Array.ofArray (← children ()))
+      let leaf ← Node.functionComponent counterView props (← Js.Array.ofArray (← children.render ()))
       let wrapper ← attributes "counter" styles.unsupported
       return some (← <section @props={wrapper}>{pure leaf}</section>) }
   let first := document 0

@@ -495,8 +495,32 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
       let changed := changedIds.contains identity.debugPath
       let focused := focus == some identity.debugPath
       let attributes := fun kind style => blockProps styles debug identity kind style changed focused
-      let children := fun _ : Unit =>
-        renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
+      let children : BlockChildren := {
+        render := fun _ =>
+          renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
+        splitParagraph? := fun _ => do
+          let some first := content[0]? | none
+          let .para inlines := first | none
+          let identities := blockIdentities renderers identity.semanticKey identity.debugPath content fingerprint
+          let leading := identities[0]!
+          let summary : Unit → ReactM (Js Props × Array (Js Node)) := fun _ => do
+            let props ← blockProps styles debug leading "paragraph" styles.paragraph
+              (changedIds.contains leading.debugPath) (focus == some leading.debugPath)
+            return (props, ← renderInlines styles renderers inlines)
+          let body : Unit → ReactM (Array (Js Node)) := fun _ => (content.extract 1 content.size).mapIdxM fun index block =>
+            renderBlock styles renderers fingerprint changedIds focus debug identities[index + 1]! block
+          some (summary, body)
+        listItems? := fun _ => do
+          let #[.ul items] := content | none
+          let list := (blockIdentities renderers identity.semanticKey identity.debugPath content fingerprint)[0]!
+          some (items.mapIdx fun index item => fun _ : Unit => do
+            let key := s!"item:{index}"
+            let path := RenderPath.child list.debugPath "item" index
+            let props ← listItemProps styles debug key path "list-item" styles.listItem
+              (focus == some path || focus == some list.debugPath)
+            let nodes ← renderBlocks styles renderers fingerprint changedIds focus debug
+              (semanticChild list.semanticKey "item" key) path item.contents
+            return (props, nodes)) }
       match ← renderers.renderBlock? identity.reactKey attributes extension children with
       | some rendered => pure rendered
       | none =>
@@ -506,7 +530,7 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
           let marker ← <code @props={markerProps}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[block extension: {renderers.blockName extension}]")}</code>
           let props ← attributes "unsupported-extension" (styles.unsupported)
           Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString (renderers.blockName extension))
-          let childNodes ← children ()
+          let childNodes ← children.render ()
           return ← <div @props={props}>{pure marker}{Js.Array.ofArray childNodes}</div>
 
 where

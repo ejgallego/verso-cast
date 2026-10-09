@@ -18,6 +18,20 @@ open _root_.Verso
 /-- A replacement heading receives the level, fresh attributes and title nodes. -/
 abbrev HeaderRenderer := Nat → Js Props → Array (Js Node) → ReactM (Js Node)
 
+/-- Lazy views of an extension's children, with their original source addresses
+and sibling identities. Choose one view; render each selected child at most once.
+No child rendering happens while inspecting the shape. -/
+structure BlockChildren where
+  /-- Ordinary block nodes, including their paragraph/list wrappers. -/
+  render : Unit → ReactM (Array (Js Node))
+  /-- A leading paragraph's attributes/inlines and the remaining block nodes.
+  Useful for summaries/captions without creating a discarded paragraph node. -/
+  splitParagraph? : Unit → Option
+    ((Unit → ReactM (Js Props × Array (Js Node))) × (Unit → ReactM (Array (Js Node))))
+  /-- The cells of a single unordered list, as attributes and block contents.
+  Useful for structured layouts without creating discarded ul/li nodes. -/
+  listItems? : Unit → Option (Array (Unit → ReactM (Js Props × Array (Js Node))))
+
 /--
 Application-owned genre renderers. Unhandled extensions remain visible together
 with their children. Callbacks may return ordinary component nodes, but are not
@@ -36,10 +50,10 @@ structure Renderers (g : Doc.Genre) where
   /--
   Replace a block extension, or return `none` for the visible fallback.
   `attributes kind style` supplies the existing key, identity, focus and change
-  markers. Call `children ()` once when needed; hidden blocks can skip it.
+  markers. Use one lazy child view; hidden blocks can skip children entirely.
   -/
   renderBlock? : (key : String) → (attributes : String → Js Props → ReactM (Js Props)) →
-      g.Block → (children : Unit → ReactM (Array (Js Node))) →
+      g.Block → (children : BlockChildren) →
       ReactM (Option (Js Node)) :=
     fun _ _ _ _ => pure none
   /-- Optional opaque semantic identity; any string is accepted, including separators.

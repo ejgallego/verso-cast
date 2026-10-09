@@ -11,20 +11,20 @@ import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 export const root = fileURLToPath(new URL("..", import.meta.url));
 
 // Public Lake queries, not paths inferred from OLean locations.
-export function query(target) {
-  return resolve(root, JSON.parse(execFileSync("lake", ["--json", "query", target], {
-    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"],
+export function query(target, { cwd = root } = {}) {
+  return resolve(cwd, JSON.parse(execFileSync("lake", ["--json", "query", target], {
+    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"],
   })));
 }
 
-export async function openTestRuntime(target = "+VersoCastTests:vir") {
+export async function openTestRuntime(target = "+VersoCastTests:vir", { cwd = root } = {}) {
   execFileSync("lake", ["exe", "cast-assets"], { cwd: root, stdio: "inherit" });
   const identity = JSON.parse(await readFile(resolve(root, ".vir/runtime.json"), "utf8"));
   const wasmBytes = await readFile(resolve(root, ".vir/runtime.wasm"));
   assert.equal(createHash("sha256").update(wasmBytes).digest("hex"), identity.sha256);
   const runtime = await createVirRuntime({
     wasmBytes,
-    irPackageSet: pathToFileURL(query(target)).href,
+    irPackageSet: pathToFileURL(query(target, { cwd })).href,
     fetchBytes: url => readFile(fileURLToPath(url)),
     // VIR owns this fresh provider and its cleanup, not a copied host adapter.
     defaultHostBindings: () => createBrowserHostBindings({

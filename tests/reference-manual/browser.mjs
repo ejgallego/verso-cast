@@ -3,11 +3,18 @@ import { createRoot } from "react-dom/client";
 import { createVirRuntime } from "lean-vir";
 import { createBrowserHostBindings } from "lean-vir/host-bindings";
 import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+import { pages } from "./pages.mjs";
 
 // Controlled RPC transport only: real Wasm, Lean decoder, Cast, React and DOM.
 // This tests the client lifecycle, not the actual editor/LSP connection.
-const documents = await Promise.all(["intro", "empty"].map(async name =>
+const documents = await Promise.all(pages.map(async ({ name }) =>
   (await fetch(`${name}.json`)).text()));
+const staticPages = await Promise.all(pages.map(async ({ name }) =>
+  (await fetch(`${name}.ssr.html`)).text()));
+const showStatic = index => {
+  const pane = document.getElementById("ssr");
+  if (pane) pane.innerHTML = staticPages[index];
+};
 let current = 0, malformed = false, hold = false, pending = [], calls = 0;
 const handlers = new Set();
 const session = { call(method, params, options) {
@@ -62,11 +69,23 @@ const editExample = text => {
 window.manualPreview = {
   get calls() { return calls; },
   get subscriptions() { return handlers.size; },
-  select(index) { current = index; uri = index ? "file:///Manual/BasicTypes/Empty.lean" : "file:///Manual/Intro.lean"; render(); },
+  select(index) {
+    if (!pages[index]) throw Error("unknown sample page");
+    current = index; uri = `file:///${pages[index].module.replaceAll(".", "/")}.lean`;
+    const picker = document.getElementById("sample");
+    if (picker) picker.value = String(index);
+    showStatic(index); render();
+  },
   edit, editExample, render,
   malformed(value) { malformed = value; edit(); },
   hold(value) { hold = value; },
   release() { const replies = pending; pending = []; replies.forEach(resolve => resolve()); },
   dispose() { try { root.unmount(); } finally { runtime.dispose(); } },
 };
+const picker = document.getElementById("sample");
+if (picker) {
+  pages.forEach(({ title }, index) => picker.add(new Option(title, String(index))));
+  picker.addEventListener("change", () => window.manualPreview.select(Number(picker.value)));
+}
+showStatic(0);
 render();

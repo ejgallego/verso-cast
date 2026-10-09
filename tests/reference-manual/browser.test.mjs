@@ -1,23 +1,57 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFile, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { chromium } from "playwright";
+import { renderToStaticMarkup } from "react-dom/server";
 import { stageProgram, serveDemo } from "../../tools/demo.mjs";
+import { openTestRuntime } from "../runtime.mjs";
+import { pages } from "./pages.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const manual = resolve(root, ".local/reference-manual");
+const newSupported = ["Verso.Genre.Manual.Block.table", "Verso.Genre.Manual.Block.paragraph",
+  "Verso.Genre.Manual.Block.internalSignature", "Verso.Genre.Manual.Block.fieldSignature",
+  "Verso.Genre.Manual.InlineLean.Block.exampleFile", "Verso.Genre.Manual.InlineLean.Block.exampleLeanFile",
+  "Manual.example", "Manual.syntax", "Manual.grammar", "Manual.keyword", "Manual.figure"];
 const run = args => execFileSync("lake", args, { cwd: manual, stdio: "inherit" });
-run(["build", "CastManualPreview", "+Manual.Intro:olean", "+Manual.BasicTypes.Empty:olean"]);
+run(["build", "CastManualPreview", ...pages.map(page => `+${page.module}:olean`)]);
 run(["env", "lean", "--run", "cast-preview/ExportPages.lean"]);
 const output = resolve(root, "_out/reference-manual");
 await stageProgram("+CastManualPreview:vir", output, { cwd: manual });
 await copyFile(resolve(manual, ".cast-preview/widget.irpkg"), resolve(output, "widget.irpkg"));
-for (const name of ["intro", "empty"])
+for (const { name } of pages)
   await copyFile(resolve(manual, `.cast-preview/${name}.json`), resolve(output, `${name}.json`));
-await copyFile(resolve(root, "examples/browser/index.html"), resolve(output, "index.html"));
+// Original images referenced by the selected Monadic Syntax page. Keep their
+// published paths; do not fetch web assets or replace them with mock images.
+await mkdir(resolve(output, "static/screenshots"), { recursive: true });
+for (const name of ["do-return-hl-1.png", "do-return-hl-2.png"])
+  await copyFile(resolve(manual, "static/screenshots", name), resolve(output, "static/screenshots", name));
+const { runtime } = await openTestRuntime("+CastManualPreview:vir", { cwd: manual });
+const staticPages = [], inventory = [];
+try {
+  for (const { name, module } of pages) {
+    const input = await readFile(resolve(output, `${name}.json`), "utf8");
+    const html = renderToStaticMarkup(runtime.call("CastManualPreview.renderDocument", input));
+    staticPages.push(html);
+    await writeFile(resolve(output, `${name}.ssr.html`), html);
+    const extensions = {};
+    const visit = value => {
+      if (!value || typeof value !== "object") return;
+      const name = value.other?.container?.name;
+      if (name) extensions[name] = (extensions[name] ?? 0) + 1;
+      Object.values(value).forEach(child => Array.isArray(child) ? child.forEach(visit) : visit(child));
+    };
+    visit(JSON.parse(input));
+    inventory.push({ module, extensions });
+  }
+} finally { runtime.dispose(); }
+const html = (await readFile(resolve(root, "examples/browser/index.html"), "utf8"))
+  .replace('<div id="app">', '<label>Sample page <select id="sample"></select></label><div id="app">')
+  .replace('<script type="module"', '<details><summary>React SSR comparison</summary><div id="ssr"></div></details><script type="module"');
+await writeFile(resolve(output, "index.html"), html);
 await build({ absWorkingDir: root, entryPoints: ["tests/reference-manual/browser.mjs"],
   outfile: resolve(output, "app.js"), bundle: true, format: "esm", target: "es2022" });
 // Sanity check that these really are different elaborated documents.
@@ -32,7 +66,7 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(url);
-  const heading = name => page.getByRole("heading", { name, exact: true });
+  const heading = name => page.locator("#app").getByRole("heading", { name, exact: true });
   try { await heading("Introduction").waitFor({ timeout: 10000 }); }
   catch (error) {
     console.error("Initial preview errors:", errors);
@@ -110,6 +144,53 @@ try {
   await page.evaluate(() => window.manualPreview.select(0));
   await heading("Introduction").waitFor();
   await page.screenshot({ path: resolve(output, "intro.png"), fullPage: true });
+  // Reset the edited fixture before comparing the original checked pages.
+  await page.reload();
+  await heading("Introduction").waitFor();
+  for (const [index, sample] of pages.entries()) {
+    await page.evaluate(index => window.manualPreview.select(index), index);
+    await heading(sample.title).waitFor();
+    await page.evaluate(html => { document.getElementById("ssr").innerHTML = html; }, staticPages[index]);
+    const comparison = await page.evaluate(() => {
+      const shape = node => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent || null;
+        if (node.nodeType !== Node.ELEMENT_NODE) return null;
+        const children = [];
+        for (const child of node.childNodes) {
+          const value = shape(child);
+          if (value === null) continue;
+          if (typeof value === "string" && typeof children.at(-1) === "string") children[children.length - 1] += value;
+          else children.push(value);
+        }
+        return [node.tagName, children];
+      };
+      const live = document.querySelector("#app article"), ssr = document.querySelector("#ssr article");
+      return { live: shape(live), ssr: shape(ssr),
+        fallbacks: [...live.querySelectorAll("code")].map(node => node.textContent)
+          .filter(text => /^\[(inline|block) extension:/.test(text)) };
+    });
+    assert.deepEqual(comparison.live, comparison.ssr, `${sample.module}: live/SSR without parser repair`);
+    inventory[index].fallbacks = comparison.fallbacks;
+    for (const name of newSupported)
+      assert.equal(comparison.fallbacks.some(text => text === `[block extension: ${name}]` ||
+        text === `[inline extension: ${name}]`), false, `${sample.module}: handled ${name}`);
+    if (sample.name === "products") {
+      assert.equal(await page.locator("#app table thead th").count(), 5);
+      assert.equal(await page.locator("#app table tbody tr").count(), 5);
+      assert.equal(await page.locator('#app table th[scope="col"]').count(), 5);
+    }
+    if (sample.name === "int") assert.ok(await page.locator('#app code[data-verso-math-mode="inline"]').count(),
+      "math source remains visible without pretending a typesetter was loaded");
+    if (sample.name === "monads") await page.waitForFunction(() => {
+      const images = [...document.querySelectorAll("#app img")];
+      return images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0);
+    });
+    if (sample.name === "structures") assert.ok(await page.locator('#app summary code').count(),
+      "stored rich example titles render as code, not flattened text");
+    console.log(`${sample.module}: ${comparison.fallbacks.length} visible fallbacks; live/SSR PASS`);
+    await page.screenshot({ path: resolve(output, `${sample.name}.png`), fullPage: true });
+  }
+  await writeFile(resolve(output, "coverage.json"), JSON.stringify(inventory, null, 2) + "\n");
   await page.evaluate(() => window.manualPreview.dispose());
   assert.equal(await page.locator("#app").textContent(), "");
   assert.equal(await page.evaluate(() => window.manualPreview.subscriptions), 0);

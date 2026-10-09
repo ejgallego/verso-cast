@@ -2,6 +2,7 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Manual
+public import Manual.Meta.Syntax.Grammar
 meta import VersoManual.Basic
 
 public section
@@ -46,6 +47,10 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
           Lean.fromJson? ext.data | return none
         return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
           {ProofWidgets.Html.text word}</code>)
+      else if ext.name == `Manual.keyword then
+        let .ok word := ext.data.getStr? | return none
+        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text word}</code>)
       else base.renderInline? key ext children
     renderBlock? := fun key attributes ext children => do
       if ext.name == `Manual.proofState then
@@ -59,17 +64,42 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
       else if ext.name == `Manual.example then
         -- Raw and traversed forms both have five fields. The tag supplies only
         -- identity above; links are unresolved without reference traversal.
-        let .ok ((description, _, opened, _, _) : String × Option String × Bool ×
+        let .ok ((_description, _, opened, _, _) : String × Option String × Bool ×
             Option Lean.Json × Option String) := Lean.fromJson? ext.data | return none
-        let nodes ← children ()
+        let some (summary, body) := children.splitParagraph? () | return none
+        let (summaryProps, title) ← summary ()
+        Js.Object.set summaryProps (← js#"style") summaryStyle
         let props ← attributes "example" calloutStyle
         -- Set the initial browser-owned disclosure state, not React-controlled
         -- state; unchanged attributes preserve user toggles across parent updates.
         if opened then Js.Object.set props (← js#"open") (← JsValue.ofBool true)
         return some (← <details @props={props}>
-          <summary style={summaryStyle}>{ProofWidgets.Html.text description}</summary>
-          <div style={styles.part}>{Js.Array.ofArray (nodes.extract 1 nodes.size)}</div>
+          <summary @props={summaryProps}>{Js.Array.ofArray title}</summary>
+          <div style={styles.part}>{Js.Array.ofArray (← body ())}</div>
         </details>)
+      else if ext.name == `Manual.syntax then
+        let .ok ((_, _, label, _, _) : Option String × Lean.Name × String ×
+            Option Lean.Json × Array Lean.Name) := Lean.fromJson? ext.data | return none
+        let some (summary, body) := children.splitParagraph? () | return none
+        let (summaryProps, title) ← summary ()
+        Js.Object.set summaryProps (← js#"style") summaryStyle
+        let props ← attributes "syntax" calloutStyle
+        return some (← <section @props={props}>
+          <div @props={summaryProps}><span>{ProofWidgets.Html.text label}</span> {Js.Array.ofArray title}</div>
+          {Js.Array.ofArray (← body ())}</section>)
+      else if ext.name == `Manual.grammar then
+        let .ok ((_, bnf, _) : Lean.Name × Lean.Widget.TaggedText Manual.GrammarTag × Lean.Json) :=
+          Lean.fromJson? ext.data | return none
+        let props ← attributes "grammar" styles.codeBlock
+        return some (← <pre @props={props}><code>{ProofWidgets.Html.text bnf.stripTags}</code></pre>)
+      else if ext.name == `Manual.figure then
+        let .ok (_ : String × Option String × Option Lean.Json) := Lean.fromJson? ext.data | return none
+        let some (caption, body) := children.splitParagraph? () | return none
+        let (captionProps, title) ← caption ()
+        Js.Object.set captionProps (← js#"style") summaryStyle
+        let props ← attributes "figure" calloutStyle
+        return some (← <figure @props={props}>{Js.Array.ofArray (← body ())}
+          <figcaption @props={captionProps}>{Js.Array.ofArray title}</figcaption></figure>)
       else base.renderBlock? key attributes ext children }
 
 end CastManualPreview.Extensions

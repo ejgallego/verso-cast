@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile, access, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { pages as samplePages } from "../tests/reference-manual/pages.mjs";
 
 export const manualRevision = "349244b4dd2f284728c1dacb621cc74a32f9929b";
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -122,7 +123,7 @@ async function setup() {
   console.log(`Prepared ${state.pages} Manual pages at ${manualRevision}.`);
   console.log(`Reference copy: ${destination}`);
   if (process.argv.includes("--build"))
-    run(destination, "lake", ["build", "CastManualPreview", "+Manual.Intro:olean", "+Manual.BasicTypes.Empty:olean"]);
+    run(destination, "lake", ["build", "CastManualPreview", ...samplePages.map(page => `+${page.module}:olean`)]);
   console.log(`Open in VS Code: code --new-window ${destination} --goto ${destination}/Manual/Intro.lean:35`);
   console.log("Select a page in Manual/. Initial imports may build; edit notifications refresh the whole checked page.");
 }

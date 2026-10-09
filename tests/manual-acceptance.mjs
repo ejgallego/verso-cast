@@ -25,6 +25,18 @@ try {
   assert.ok(html.includes("[block extension: Verso.Genre.Manual.InlineLean.Block.lean]"));
   assert.ok(html.includes("[block extension: Unknown.manual]"));
   assert.ok(html.includes("unknown children survive"));
+  assert.match(html, /<table[^>]*data-verso-kind="table"/);
+  assert.match(html, /<thead><tr/);
+  assert.match(html, /<tbody><tr/);
+  assert.match(html, /scope="col"/);
+  for (const text of ["Internal.name : Nat", "private field : Nat", "internal documentation",
+    "field documentation", "Inherited from", "Parent", "stdin", "input &lt;text&gt;", "File: Example.lean"])
+    assert.ok(html.includes(text), text);
+  assert.equal((html.match(/\[block extension: Verso.Genre.Manual.Block.table\]/g) ?? []).length, 1,
+    "zero-column table keeps its children in visible fallback");
+  for (const [count, columns, expected] of [[4n, 2n, 4n], [4n, 4n, 4n], [4n, 0n, 0n], [4n, 3n, 0n], [0n, 2n, 0n]])
+    assert.equal(runtime.call("VersoCastTests.Manual.tableWork", count, columns), expected,
+      "valid cells render once; invalid shapes do not render any cells");
   const keys = (node, found = []) => {
     if (isValidElement(node)) {
       found.push([node.type, node.key]);

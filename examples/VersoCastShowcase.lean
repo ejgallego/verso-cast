@@ -53,7 +53,7 @@ private def document (showNote : Bool) : Doc.Part genre :=
       return some (← <span @props={props}>{Js.Array.ofArray (← children ())}</span>)
     renderBlock? := fun _key attributes _ children => do
       let props ← attributes "note" noteStyle
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children ())}</aside>)
+      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
     renderPart? := fun _key (label : String) _part renderDefault => do
       let header : VersoCast.Renderer.HeaderRenderer := fun level props title => do
         Js.Object.set props (← JsValue.ofString "id") (← JsValue.ofString s!"showcase-{label}")

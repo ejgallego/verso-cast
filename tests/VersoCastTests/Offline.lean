@@ -3,6 +3,7 @@ Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast
 public import VersoCastTests.Fixture
+public import VersoCast.Renderer.Table
 meta import Vir.Attributes
 
 public section
@@ -11,7 +12,8 @@ open VersoCast Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 private def renderers (highlight : FunctionComponent (Props.WithData Unit))
-    (data : JSL Unit) (visits : RuntimeRef (Nat × Nat)) (idPrefix : String) : Renderer.Renderers Fixture.genre where
+    (data : JSL Unit) (visits : RuntimeRef (Nat × Nat)) (idPrefix : String)
+    (styles : Renderer.Styles) (tables : Renderer.Table.Styles) : Renderer.Renderers Fixture.genre where
   renderInline? := fun key extension children => do
     match extension with
     | .highlight =>
@@ -27,12 +29,21 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
     match extension with
     | .notice =>
       visits.modify fun (inlines, blocks) => (inlines, blocks + 1)
-      let props ← attributes "notice" (← Renderer.Style.unsupported)
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children ())}</aside>)
+      let props ← attributes "notice" styles.unsupported
+      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
     | .hidden =>
       let props ← js%{ "key" := (← JsValue.ofString key) }
       return some (← Node.fragment props (← Js.Array.empty))
     | .unsupported => return none
+    | .summary =>
+      let some (summary, body) := children.splitParagraph? () | return none
+      let (props, title) ← summary ()
+      let wrapper ← attributes "summary" styles.unsupported
+      return some (← <details @props={wrapper}><summary @props={props}>{Js.Array.ofArray title}</summary>
+        <div>{Js.Array.ofArray (← body ())}</div></details>)
+    | .table =>
+      let some cells := children.listItems? () | return none
+      return ← Renderer.Table.render tables (← attributes "table" tables.table) 2 true cells
   renderPart? := fun key (metadata : String) _part renderDefault => do
     let header : Renderer.HeaderRenderer := fun level props title => do
       Js.Object.set props (← JsValue.ofString "id") (← JsValue.ofString s!"{idPrefix}section-{metadata}")
@@ -48,6 +59,7 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
 
 @[vir_export] def View (idPrefix : String) : ReactM (FunctionComponent Props) := do
   let styles ← Renderer.Styles.create
+  let tables ← Renderer.Table.Styles.create
   let initial ← JsValue.ofString "ready"
   let clicked ← JsValue.ofString "clicked"
   let data ← LeanRef.toJSL ()
@@ -60,7 +72,7 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
       Js.Function.callVoid setter (SetStateAction.ofValue clicked)
     return ← <mark data-cast-initial={state} onClick={click}
         title="Click to exercise retained React state">{Props.WithData.children props}</mark>
-  let handlers := renderers highlight data visits idPrefix
+  let handlers := renderers highlight data visits idPrefix styles tables
   FunctionComponent.ofLean fun _ => do
     visits.set (0, 0)
     let rendered ← Renderer.render styles Fixture.document (renderers := handlers)
@@ -96,7 +108,7 @@ children are not visited; this test uses no hashing/JSON identity capability. -/
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
       let nodes ← match extension with
         | .hidden => Js.Array.empty
-        | _ => Js.Array.ofArray (← children ())
+        | _ => Js.Array.ofArray (← children.render ())
       return some (← Node.fragment props nodes) }
   let hidden : Verso.Doc.Block Fixture.genre := .other .hidden #[.other .notice #[]]
   let document : Verso.Doc.Part Fixture.genre := .mk #[] "" none

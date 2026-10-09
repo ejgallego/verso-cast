@@ -106,7 +106,8 @@ test support, not the Cast library.
 Place the cursor in a page under `Manual/`. The widget shows that module's
 whole checked document; opening another page changes the preview, and edits
 refresh it through the standard infoview notification/RPC APIs. Setup builds
-Introduction and The Empty Type. Other pages may build imports when first
+Introduction, The Empty Type, Tuples, Integers, Monadic Syntax and Structure
+Declarations. Other pages may build imports when first
 opened; to prepare all of them, run `lake build Manual` inside the copy.
 Do not build that copy and Cast concurrently: their dependencies are shared.
 Existing legacy pages may emit a missing-`module` warning; they are not migrated.
@@ -114,16 +115,20 @@ Existing legacy pages may emit a missing-`module` warning; they are not migrated
 This is a raw-document validation mode, not the generated reference website:
 it does not run Manual traversal, resolve references or typeset math. Built-in
 Lean code/output render as text panels; the consumer adds proof-state panels
-and collapsible examples. Example summaries use their plain-text description;
-rich summary markup and hover information are not implemented. The adapter
+and collapsible examples. Example and syntax summaries preserve stored rich
+inlines; grammar displays its stored text without interactive grammar links.
+Figures preserve rich captions. The browser harness stages the two pinned
+screenshots; VS Code asset-URL mapping is not implemented yet.
+Interactive hover information is not implemented. The adapter
 colours stored Lean tokens with cached native styles, formats inline Lean and
-glossary terms, and displays docstring containers and syntax-error diagnostics.
+glossary terms, and displays docstring containers, field signatures, labeled
+file examples, tables and syntax-error diagnostics.
 Unsupported extensions have visible named
 placeholders. The test-only transport uses `ToJson`/`FromJson` and Lean's JSON
 parser, not an optimized codec; its latency is not a renderer benchmark.
 
 The browser replay validates the public Lake facet and runs the retained package
-that the widget RPC would emit, using real elaborated Introduction/Empty pages.
+that the widget RPC would emit, using the six real elaborated sample pages.
 The widget declares meta/private imports for the Manual implementations it snapshots,
 so those body changes rebuild that package despite ordinary opaque imports.
 The replay tests
@@ -131,6 +136,18 @@ decoding, rendering, page changes, edit refresh, stale replies, malformed input
 recovery and disposal, including edits inside an open example. Its RPC transport
 is controlled, not a real VS Code/LSP connection. Screenshots are written under
 `_out/reference-manual/`.
+
+Each selected page is compared with React SSR from the same decoder/adapter;
+parsed element/text structures must agree. The browser replay writes a source
+extension inventory and remaining visible fallbacks to `coverage.json` in that
+output directory. Its browser page has a sample selector and an expandable SSR
+pane. The ordinary three-way comparison additionally covers nested rich
+summaries and tables against `Output.Html.asString`; Verso layout differences
+remain illustrative, not a universal equality constraint.
+
+Remaining fallbacks in this sample include references/citations, generated
+license/index data and consumer roles such as TODO and attributes. They remain
+visible; this validation does not claim whole-manual extension coverage.
 
 The widget's sticky header contains an off-by-default Debug checkbox and its
 inspection explanation, outside the rendered article. It enables renderer
