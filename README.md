@@ -57,9 +57,10 @@ require npm or KaTeX. [Math contract and demo](doc/RENDERING.md#optional-math-le
 From a source checkout:
 
 ```sh
-lake build VersoCast VersoCastTests VersoCastExamples cast-assets cast-standard-html
+lake build VersoCast VersoCastTests cast-assets cast-standard-html
 lake test
 npm ci
+lake build VersoCastExamples
 npm test
 npm run demo
 ```

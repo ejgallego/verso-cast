@@ -23,7 +23,7 @@ jobs:
         with:
           auto-config: false
           build: true
-          build-args: VersoCast VersoCastTests VersoCastExamples cast-assets cast-standard-html
+          build-args: VersoCast VersoCastTests cast-assets cast-standard-html
           test: true
           use-github-cache: false
           use-mathlib-cache: false
@@ -37,4 +37,7 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
       - name: Check real React SSR and Chromium
-        run: npm test
+        # VIR's widget bundle is built only after root npm tooling is installed.
+        run: |
+          lake build VersoCastExamples
+          npm test

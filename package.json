@@ -12,7 +12,8 @@
     "react": "^19.2.7"
   },
   "scripts": {
-    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:math",
+    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math",
+    "test:showcase": "node tests/showcase-browser.mjs",
     "test:renderer": "node tests/render-acceptance.mjs",
     "test:widget": "node tests/widget-browser.mjs",
     "test:identity": "node tests/identity-browser.mjs",

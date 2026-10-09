@@ -2,12 +2,14 @@
 
 Run commands from the repository root. The Lean library build does not need npm;
 JavaScript/browser checks and demos do. Build Lean before `npm ci`, because the
-local VIR npm dependency lives in Lake's revision-locked checkout.
+local VIR npm dependency lives in Lake's revision-locked checkout. Build widget
+examples after `npm ci`: VIR's infoview bundle uses root npm tooling.
 
 ```sh
-lake build VersoCast VersoCastTests VersoCastExamples cast-assets cast-standard-html
+lake build VersoCast VersoCastTests cast-assets cast-standard-html
 lake test
 npm ci
+lake build VersoCastExamples
 npm test
 ```
 
@@ -39,6 +41,7 @@ successful remote CI run; no publish credentials or release step are present.
 npm ci
 npm run test:renderer
 npm run test:widget
+npm run test:showcase
 npm run test:identity
 npm run test:offline
 npm run test:math
