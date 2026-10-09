@@ -10,6 +10,7 @@ public import VersoCast
 public import VersoCast.Manual
 public import VersoCastTests.Fingerprint
 public import VersoCastTests.Offline
+public import VersoCastTests.Retention
 meta import VersoCast.Renderer
 meta import VersoCast.Manual
 meta import VersoManual.Basic

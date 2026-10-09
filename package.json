@@ -7,6 +7,7 @@
   "scripts": {
     "test:renderer": "node tests/render-acceptance.mjs",
     "test:widget": "node tests/widget-browser.mjs",
+    "test:identity": "node tests/identity-browser.mjs",
     "test:offline": "node tests/offline-comparison.mjs",
     "compare": "node tests/offline-comparison.mjs",
     "compare:serve": "node tools/compare.mjs",

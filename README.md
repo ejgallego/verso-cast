@@ -107,6 +107,7 @@ cost claims, not measured latency results.
 npm ci
 npm run test:renderer
 npm run test:widget
+npm run test:identity
 npm run test:offline
 ```
 
@@ -123,6 +124,33 @@ updates, functional callbacks, unmount and disposal. This is component/browser
 acceptance, not an automated VS Code infoview test or a performance benchmark.
 If Chromium is not installed, run `npx playwright install chromium` first.
 The plain Lean build/test does not require npm or browser assets.
+
+## Old-renderer parity and remaining gates
+
+The reference is the extracted `packages/verso-react` source in VBP checkpoint
+`9aa9d8892cf9c243e12771fc29418e9f2b777f3b`. Its Manual fixtures and key assertions
+are retained here; this is not an execution comparison between the old 4.34
+runtime and the current 4.35 runtime. Deliberate changes include generic genres,
+part-metadata hooks, immutable extra attributes, no fixed document ID, and valid
+inline footnotes instead of a block `details` element inside a paragraph.
+
+| Area | Current evidence / boundary |
+| --- | --- |
+| Ordinary document forms, source math, escaping | Inherited Manual SSR assertions plus the shared Verso/SSR/live fixture |
+| Extension replacement, fallback, hidden children | Inherited callbacks plus counted generic-genre dispatch and lazy-child checks |
+| Identity collisions, duplicate contents, retirement | Pure typed-state tests and inherited key assertions |
+| State through document edits | `test:identity`: live insertion, reorder, body edit, removal/reinsertion, duplicate semantic IDs; ordinary DOM retention and disposal |
+| Focus/change diagnostics | Inherited path/key and fragment-focus checks; editor selection/follow-cursor acceptance remains with VBP |
+| Math typesetting | Stable component-injection API retained; KaTeX leaf not yet ported/qualified. The old effect-only leaf had no offline typeset output |
+| Blueprint informal blocks, external markup, math preludes | VBP-owned adapter and consumer parity gates; not inferred from Manual tests |
+| Transport, codecs, FIR backend, editor shell | Separate owner-held integration gates; no private decoder or copied provider adopted here |
+
+The retention fixture accepts each document and its corresponding
+`Fingerprint.State` in one functional React state update. It uses public
+`LeanRef` to retain that Lean value, not a private wire format or mutable identity
+registry. Styles, component types and the counter updater are created once per
+factory. The old VBP demo should remain until its own extension/widget parity
+checks pass; Cast's fixture is not a substitute for them.
 
 ## Offline rendering and comparison
 
