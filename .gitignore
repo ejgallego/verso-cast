@@ -1,0 +1,7 @@
+/.lake/
+/.beam/
+/node_modules/
+/_out/
+/.local/
+/tests/downstream/.lake/
+/tests/downstream/lake-manifest.json

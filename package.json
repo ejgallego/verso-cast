@@ -1,0 +1,14 @@
+{
+  "name": "verso-cast",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test:renderer": "node tests/render-acceptance.mjs"
+  },
+  "devDependencies": {
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  }
+}
