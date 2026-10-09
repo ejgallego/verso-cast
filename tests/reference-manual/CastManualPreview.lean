@@ -12,6 +12,7 @@ public meta import CastManualPreview.Server
 meta import all CastManualPreview.Extensions
 meta import all VersoCast.Manual
 meta import all VersoCast.Manual.Highlighting
+meta import all VersoCast.Renderer
 meta import Vir.Attributes
 
 public section
@@ -33,11 +34,20 @@ private structure Response where
 private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
   let styles ← VersoCast.Renderer.Styles.create
   let renderers ← Extensions.create styles
+  let shellStyle ← js%{ "position" := (← js#"sticky"), "top" := (← js#"0"),
+    "zIndex" := (← js#"1"), "padding" := (← js#"8px"),
+    "background" := (← JsValue.ofString VersoCast.Renderer.Style.background),
+    "borderBottom" := (← js#"1px solid var(--vscode-panel-border, #d0d7de)") }
+  let toggleDebug ← Js.Function.ofLean fun (previous : Js Bool) => Js.Boolean.not previous
   FunctionComponent.ofLean fun props => do
     let input : Input ← LeanRef.fromJSL (← Props.WithData.data props)
     let initializer ← Js.Function.ofLean0 (LeanRef.toJSL ({} : Response))
     js#let (value, setter) ← Hooks.useState initializer
     js#let (revision, setRevision) ← Hooks.useState (α := Nat) (← JsValue.ofNat 0)
+    js#let (debugValue, setDebug) ← Hooks.useState (α := Bool) (← JsValue.ofBool false)
+    let debug ← JsValue.toBool debugValue
+    let debugChanged ← Js.Function.ofLeanVoid fun (_ : Js SyntheticEvent) =>
+      Js.Function.callVoid setDebug (SetStateAction.ofUpdater toggleDebug)
     let changed ← Js.Function.ofLeanVoid fun (params : Js.Any) => do
       let doc ← Js.Object.get params (← js#"textDocument")
       let uri ← Js.String.fromAny (← Js.Object.get doc (← js#"uri"))
@@ -89,10 +99,18 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
     let rendered : ReactM (Js.Nullable Node) := match state.document with
       | none => Js.Nullable.null
       | some doc => do
-          Js.Nullable.ofJs (← VersoCast.Renderer.render styles doc
+          Js.Nullable.ofJs (← VersoCast.Renderer.render styles doc { debug }
           (renderers := renderers))
+    let debugPanel : ReactM (Js.Nullable Node) := if debug then do
+      Js.Nullable.ofJs (← <aside data-cast-debug="true">Inspection metadata enabled. Keys use author identities when supplied,
+        otherwise positions. Timing instrumentation is disabled.</aside>)
+      else Js.Nullable.null
     return ← <section>
-      <p role="status">{Lean.Vir.ProofWidgets.Html.text state.status}</p>
+      <header data-cast-preview-shell="true" style={shellStyle}>
+        <label><input type="checkbox" checked={debugValue} onChange={debugChanged}/> Debug</label>
+        <p role="status">{Lean.Vir.ProofWidgets.Html.text state.status}</p>
+        {debugPanel}
+      </header>
       {rendered}
     </section>
 

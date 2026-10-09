@@ -39,11 +39,31 @@ const render = () => root.render(React.createElement(View, { pos: { uri, line: 3
 const edit = (target = uri) => {
   for (const handler of handlers) handler({ textDocument: { uri: target } });
 };
+const editExample = text => {
+  const document = JSON.parse(documents[0]);
+  let edited = false;
+  const visit = value => {
+    if (!value || typeof value !== "object" || edited) return;
+    if (value.other?.container?.name === "Manual.example") {
+      // The first child is the summary; change the actual first body paragraph.
+      const paragraph = value.other.content.slice(1).find(child => child.para);
+      if (!paragraph) throw Error("reference example has no body paragraph");
+      paragraph.para = [{ text }];
+      edited = true;
+      return;
+    }
+    Object.values(value).forEach(child => Array.isArray(child) ? child.forEach(visit) : visit(child));
+  };
+  visit(document);
+  if (!edited) throw Error("reference example not found");
+  documents[0] = JSON.stringify(document);
+  edit();
+};
 window.manualPreview = {
   get calls() { return calls; },
   get subscriptions() { return handlers.size; },
   select(index) { current = index; uri = index ? "file:///Manual/BasicTypes/Empty.lean" : "file:///Manual/Intro.lean"; render(); },
-  edit, render,
+  edit, editExample, render,
   malformed(value) { malformed = value; edit(); },
   hold(value) { hold = value; },
   release() { const replies = pending; pending = []; replies.forEach(resolve => resolve()); },

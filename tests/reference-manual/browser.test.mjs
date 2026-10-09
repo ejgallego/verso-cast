@@ -40,6 +40,11 @@ try {
     throw error;
   }
   await page.getByText("Typographical Conventions", { exact: true }).first().waitFor();
+  const debug = page.getByRole("checkbox", { name: "Debug", exact: true });
+  assert.equal(await debug.isChecked(), false);
+  assert.equal(await page.locator('article [data-verso-render-id]').count(), 0);
+  assert.equal(await page.locator('[data-cast-debug]').count(), 0);
+  assert.equal(await page.locator('article input[type="checkbox"]').count(), 0, "debug controls belong outside the document");
   for (const name of ["Verso.Genre.Manual.InlineLean.Block.lean",
     "Verso.Genre.Manual.InlineLean.Block.leanOutput", "Manual.proofState", "Manual.example",
     "Verso.Genre.Manual.InlineLean.Block.syntaxError", "Verso.Genre.Manual.Block.docstring",
@@ -63,6 +68,20 @@ try {
   await example.locator("summary").click();
   assert.equal(await example.evaluate(node => node.open), true);
   await example.getByText("This is an example of an example.", { exact: true }).waitFor();
+  await example.evaluate(node => { window.retainedExample = node; });
+  await page.evaluate(() => window.manualPreview.editExample("Edited example body, with the disclosure still open."));
+  await example.getByText("Edited example body, with the disclosure still open.", { exact: true }).waitFor();
+  assert.equal(await example.evaluate(node => node === window.retainedExample && node.open), true,
+    "an actual document-content edit must preserve disclosure state and DOM");
+  const callsBeforeDebug = await page.evaluate(() => window.manualPreview.calls);
+  await debug.check();
+  await page.locator('[data-cast-debug]').waitFor();
+  await page.waitForFunction(() => document.querySelector('article [data-verso-identity-origin]'));
+  assert.equal(await example.evaluate(node => node === window.retainedExample && node.open), true);
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), callsBeforeDebug, "debug changes do not request the document again");
+  await debug.uncheck();
+  await page.locator('[data-cast-debug]').waitFor({ state: "detached" });
+  assert.equal(await page.locator('article [data-verso-render-id]').count(), 0);
   await page.evaluate(() => { window.firstHeading = document.querySelector("article h1"); });
   const calls = await page.evaluate(() => window.manualPreview.calls);
   await page.evaluate(() => window.manualPreview.render());

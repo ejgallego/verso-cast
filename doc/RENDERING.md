@@ -66,8 +66,19 @@ the same callbacks. Content created only by effects is absent from offline HTML.
 Basic rendering requires no JSON, equality or hash instances and uses positional
 keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
 `Renderers.fingerprint` optionally supplies content identities. For Manual,
-import `VersoCast.Manual` and extend `Manual.renderers`; this adapter preserves
-named placeholders and a stateless serialized-content key policy.
+import `VersoCast.Manual` and extend `Manual.renderers`; its default names
+unsupported extensions but does not fingerprint document content.
+Author-supplied identities take priority; other blocks use positional keys.
+Stateless serialized-content matching is explicitly opt-in:
+
+```lean
+{ fingerprint? := some (fun value => some (VersoCast.Fingerprint.canonicalKey value)) }
+```
+
+This policy serializes content and remounts a container when that content changes.
+It is not the default for interactive previews. Positional fallback preserves
+state through body edits at the same position, but not arbitrary insertion or
+reordering; provide stable semantic keys for stateful authored extensions.
 For readable built-in Lean blocks and compiler output, call
 `Manual.createRenderers styles` once in the component factory and pass the
 result to `Renderer.render`. It preserves source text, message severity,
@@ -144,13 +155,21 @@ does not introduce another analyzed document or visibility pass.
 
 ## Native attributes and ownership
 
+`Renderer.Options.debug` defaults to `false`. Source/navigation addresses,
+node kinds, focus/change markers and visible unsupported-extension output are
+always available. Inspection-only identity labels, generated path tooltips and
+root diagnostic summaries are emitted only with `{ debug := true }`; disabling
+them does not change React keys or run an extra document traversal. Client-owned
+tooltips and explicitly supplied attributes remain under client control.
+
 Extra root/math attributes are immutable `Array Renderer.Attribute` values.
 `Attribute.of nativeKey nativeValue` only widens the native value's phantom type;
 it performs no conversion or host call. Cache the array with styles/components
 in the factory. Each render allocates fresh props and applies defaults, then
 caller attributes, then reserved fields. Caller style/class/id override defaults;
-root diagnostic attributes and math key/mode (plus component source) are reserved. Values are
-borrowed, not deep-copied or mutated. No fixed document DOM ID is imposed.
+root diagnostic attributes (when debug is enabled) and math key/mode (plus
+component source) are reserved. Values are borrowed, not deep-copied or mutated.
+No fixed document DOM ID is imposed.
 Attribute application is O(p) in explicitly supplied fields, with one native
 write per field; it never enumerates an opaque native object. The ordinary
 extension dispatch adds O(1) work per visited extension, excluding its renderer,

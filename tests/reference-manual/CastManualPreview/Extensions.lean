@@ -2,11 +2,29 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Manual
+meta import VersoManual.Basic
 
 public section
 namespace CastManualPreview.Extensions
 open Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
+
+private def exampleIdentity? (ext : Verso.Genre.Manual.Block) : Option String :=
+  if ext.name == `Manual.example then
+    match ext.data with
+    | .arr #[_, .arr #[tag, _]] =>
+      match Lean.fromJson? (α := Option String) tag with
+      | .ok (some tag) => some s!"example:{tag}"
+      | _ => none
+    | _ => none
+  else none
+
+#guard exampleIdentity? {
+  name := `Manual.example
+  data := .arr #[.str "title", .arr #[.str "stable-tag", .null]] } == some "example:stable-tag"
+#guard exampleIdentity? {
+  name := `Manual.example
+  data := .arr #[.str "title", .arr #[.null, .null]] } == none
 
 /-- Reference-manual roles belong to this consumer, not Cast's generic API. -/
 def create (styles : VersoCast.Renderer.Styles) : ReactM
@@ -18,6 +36,10 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
   let keywordStyle ← js%{ "fontFamily" := (← js#"var(--vscode-editor-font-family, ui-monospace, monospace)"),
     "fontWeight" := (← js#"600"), "color" := (← js#"var(--vscode-symbolIcon-keywordForeground, #8250df)") }
   return { base with
+    -- Named examples have author-supplied sibling-local identities. Anonymous
+    -- examples retain the default positional policy; no content serialization.
+    blockIdentity? := fun ext =>
+      (exampleIdentity? ext).orElse (fun _ => base.blockIdentity? ext)
     renderInline? := fun key ext children => do
       if ext.name == `Manual.keywordOf then
         let .ok ((word, _, _, _) : String × Option Lean.Name × Lean.Name × Option String) :=
@@ -35,8 +57,8 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
         let props ← attributes "proof-state" styles.codeBlock
         return some (← <pre @props={props}><code>{ProofWidgets.Html.text text}</code></pre>)
       else if ext.name == `Manual.example then
-        -- Raw and traversed forms both have five fields. Tag/link fields are
-        -- intentionally not interpreted: this preview has no reference traversal.
+        -- Raw and traversed forms both have five fields. The tag supplies only
+        -- identity above; links are unresolved without reference traversal.
         let .ok ((description, _, opened, _, _) : String × Option String × Bool ×
             Option Lean.Json × Option String) := Lean.fromJson? ext.data | return none
         let nodes ← children ()

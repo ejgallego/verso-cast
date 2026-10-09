@@ -10,13 +10,12 @@ namespace VersoCast.Manual
 open Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
-/-- Manual's named extension placeholders and stateless content-key policy.
+/-- Manual's named extension placeholders and positional fallback keys.
 Clients extend this ordinary record with their own rendering callbacks.
 This adapter does not run Manual traversal or resolve cross-references. -/
 def renderers : Renderer.Renderers Verso.Genre.Manual where
   inlineName := fun extension => extension.name.toString
   blockName := fun extension => extension.name.toString
-  fingerprint := fun value => some (Fingerprint.canonicalKey value)
 
 /-- Readable source and compiler output for Verso's built-in Lean blocks.
 Create once in the component factory. This first presentation preserves text,

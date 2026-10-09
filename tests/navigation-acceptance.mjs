@@ -96,7 +96,11 @@ try {
     "#app [data-verso-block], #app [data-verso-list-item]")]; });
   for (const [path, expected] of cases) {
     await page.evaluate(path => window.castNavigation.update(path), path);
-    await page.waitForFunction(path => document.querySelector("#app article")?.dataset.versoFocusBlock === path, path);
+    await page.waitForFunction(expected => {
+      const actual = [...document.querySelectorAll('#app [data-verso-focus="cursor"]')].map(node =>
+        [node.tagName, node.dataset.versoBlock ?? node.dataset.versoListItem]);
+      return JSON.stringify(actual.sort()) === JSON.stringify([...expected].sort());
+    }, expected);
     const actual = await page.locator('#app [data-verso-focus="cursor"]').evaluateAll(nodes => nodes.map(node =>
       [node.tagName, node.dataset.versoBlock ?? node.dataset.versoListItem]));
     assert.deepEqual(actual.sort(), [...expected].sort(), `Chromium focus ${path}`);

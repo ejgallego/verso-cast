@@ -124,6 +124,6 @@ def render (scenario : Nat) : ReactM (Js Node) := do
   let before := document kind "before"
   let current := document kind (if scenario % 2 == 0 then "before" else "after")
   let (changedIds, _snapshotCount) := Renderer.changedBlockIdsAndCount (some before) current renderers
-  Renderer.render styles current { changedIds } renderers
+  Renderer.render styles current { changedIds, debug := true } renderers
 
 end VersoCastTests.Changes

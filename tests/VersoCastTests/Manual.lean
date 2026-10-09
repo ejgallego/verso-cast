@@ -41,4 +41,14 @@ private def malformed : Block Genre.Manual := .other {
       .other { name := `Unknown.manual, data := .null } #[.para #[.text "unknown children survive"]]] #[]
   VersoCast.Renderer.render styles doc { focus := some "part-root-block-0" } renderers
 
+/-- Debug changes attributes, not navigation, highlighting or React identity. -/
+@[vir_export] def renderDebug (debug : Bool) : ReactM (Js Node) := do
+  let styles ← VersoCast.Renderer.Styles.create
+  let para : Block .none := .para #[.text "ordinary content"]
+  let doc : Part .none := .mk #[.text "Debug defaults"] "Debug defaults" none
+    #[para, .ul #[.mk #[para]], .dl #[.mk #[.text "term"] #[para]],
+      .concat #[para]] #[.mk #[.text "Child section"] "Child section" none #[para] #[]]
+  VersoCast.Renderer.render styles doc {
+    debug, focus := some "part-root-block-0", changedIds := #["part-root-block-0"] }
+
 end VersoCastTests.Manual

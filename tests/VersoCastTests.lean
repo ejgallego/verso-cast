@@ -36,14 +36,20 @@ private def before := document (#["A", "B", "C"].map paragraph)
 private def inserted := document (#["A", "X", "B", "C"].map paragraph)
 private def moved := document (#["C", "A", "B"].map paragraph)
 
+-- Content-matching identities are an explicit policy, not Manual's default.
+private def contentRenderers : Renderer.Renderers Genre.Manual := { Manual.renderers with
+  fingerprint := fun value => some (Fingerprint.canonicalKey value) }
+
+#guard (Manual.renderers.fingerprint (.inl (paragraph "default"))).isNone
+
 #guard Renderer.changedBlockIds before before |>.isEmpty
-#guard Renderer.changedBlockIds before inserted Manual.renderers == #["part-root-block-1"]
-#guard Renderer.changedBlockIdsAndCount (some before) inserted Manual.renderers == (#["part-root-block-1"], 5)
-#guard Renderer.changedBlockIds before moved Manual.renderers |>.isEmpty
+#guard Renderer.changedBlockIds before inserted contentRenderers == #["part-root-block-1"]
+#guard Renderer.changedBlockIdsAndCount (some before) inserted contentRenderers == (#["part-root-block-1"], 5)
+#guard Renderer.changedBlockIds before moved contentRenderers |>.isEmpty
 
 private def extension (name : Lean.Name) : Genre.Manual.Block := { name, data := .null }
 
-private def applicationExtensions : Renderer.Renderers Genre.Manual := { Manual.renderers with
+private def applicationExtensions : Renderer.Renderers Genre.Manual := { contentRenderers with
   blockIdentity? := fun ext => if ext.name == `Test.notice then some "notice" else none
   renderBlock? := fun key attributes ext children => do
     if ext.name == `Test.hidden then

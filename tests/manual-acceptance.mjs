@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Children, isValidElement } from "react";
 import { openTestRuntime } from "./runtime.mjs";
 
 const { runtime } = await openTestRuntime("+VersoCastTests.Manual:vir");
@@ -24,5 +25,25 @@ try {
   assert.ok(html.includes("[block extension: Verso.Genre.Manual.InlineLean.Block.lean]"));
   assert.ok(html.includes("[block extension: Unknown.manual]"));
   assert.ok(html.includes("unknown children survive"));
+  const keys = (node, found = []) => {
+    if (isValidElement(node)) {
+      found.push([node.type, node.key]);
+      Children.forEach(node.props.children, child => keys(child, found));
+    }
+    return found;
+  };
+  const normal = runtime.call("VersoCastTests.Manual.renderDebug", false);
+  const debug = runtime.call("VersoCastTests.Manual.renderDebug", true);
+  const normalHtml = renderToStaticMarkup(normal);
+  const debugHtml = renderToStaticMarkup(debug);
+  assert.deepEqual(keys(normal), keys(debug), "debug must not change React identities");
+  assert.doesNotMatch(normalHtml, /data-verso-(render-id|identity-origin|changed-block-count|focus-block)=|title=/);
+  for (const marker of ["data-verso-block", "data-verso-part", "data-verso-list-item", "data-verso-focus", "data-verso-change"])
+    assert.ok(normalHtml.includes(marker), `navigation marker ${marker} must survive debug-off`);
+  assert.match(debugHtml, /data-verso-render-id=/);
+  assert.match(debugHtml, /data-verso-identity-origin="positional"/);
+  assert.match(debugHtml, /data-verso-changed-block-count="1"/);
+  assert.match(debugHtml, /title="render path:/);
   console.log("Manual SSR: code/output, severity, summary, escaping, single render, markers and fallback PASS");
+  console.log("Debug defaults: inspection opt-in, stable keys and navigation/change markers PASS");
 } finally { runtime.dispose(); }

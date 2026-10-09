@@ -75,6 +75,7 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
     Renderer.Attribute.of styles.strings.keys.style style,
     Renderer.Attribute.of styles.strings.keys.className (← JsValue.ofString "caller-class") ]
   let root ← Renderer.render styles Fixture.document {
+    debug := true
     attributes := attributes ++ #[
       Renderer.Attribute.of (← JsValue.ofString "id") (← JsValue.ofString "caller-id"),
       Renderer.Attribute.of styles.strings.keys.dataVersoChangedBlockCount (← JsValue.ofString "caller-cannot-override") ] }

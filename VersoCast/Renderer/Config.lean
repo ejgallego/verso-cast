@@ -74,6 +74,9 @@ conversion, native allocation or host call; the small Lean record can be cached.
 
 /-- Options computed by the stateful component before constructing the Verso VDOM. -/
 structure Options (g : Doc.Genre) where
+  /-- Opt-in inspection labels/tooltips and document diagnostic summaries.
+  React keys, source addresses, focus/change markers and fallbacks are unaffected. -/
+  debug : Bool := false
   changedIds : Array String := #[]
   /-- Source-navigation address, separate from React keys. It marks matching
   blocks/headings or list items. Fragments mark their visible child roots;
@@ -82,7 +85,7 @@ structure Options (g : Doc.Genre) where
   No DOM focus or scrolling is performed. -/
   focus : Option String := none
   /-- Later attributes override style/class defaults, never mutate their values.
-  Cast's diagnostic data attributes are reserved and written last. -/
+  When debug is enabled, Cast's diagnostic summary attributes are written last. -/
   attributes : Array Attribute := #[]
   /-- Override the adapter identity policy, e.g. with a prepared state key. -/
   fingerprint? : Option (Fingerprint.Value g → Option String) := none

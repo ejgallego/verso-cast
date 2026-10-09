@@ -40,7 +40,7 @@ Each npm test below can be run with `npm run <name>`.
 | `test:navigation` | Focus addresses, fragments, description lists and independent change markers |
 | `test:widget`, `test:showcase` | Live component state, callbacks, retained DOM and disposal |
 | `test:math` | KaTeX SSR/live output, updates, malformed input and macro isolation |
-| `test:manual` | Styled source/output, inline Lean, docstring sections, diagnostics, escaping and fallback |
+| `test:manual` | Styled source/output, inline Lean, docstring sections, escaping, fallback and default-off debug metadata |
 
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
@@ -128,8 +128,16 @@ The widget declares meta/private imports for the Manual implementations it snaps
 so those body changes rebuild that package despite ordinary opaque imports.
 The replay tests
 decoding, rendering, page changes, edit refresh, stale replies, malformed input
-recovery and disposal. Its RPC transport is controlled, not a real VS Code/LSP
-connection. Screenshots are written under `_out/reference-manual/`.
+recovery and disposal, including edits inside an open example. Its RPC transport
+is controlled, not a real VS Code/LSP connection. Screenshots are written under
+`_out/reference-manual/`.
+
+The widget's sticky header contains an off-by-default Debug checkbox and its
+inspection explanation, outside the rendered article. It enables renderer
+metadata only: no clock reads, timing bar, extra RPC request or diagnostic tree
+walk. Named examples use their authored tags; anonymous examples use positional
+keys. The browser edit test changes the serialized document body, not the saved
+manual source or its Lean elaboration.
 
 ## Runtime assets
 
