@@ -6,14 +6,13 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.React
+public import VersoCast.Renderer.Config
 public import Vir.ProofWidgets.Jsx
-public import Verso.Doc
 public import VersoCast.RenderPath
-public import VersoCast.Fingerprint
-public import VersoCast.JsStrings
 public meta import VersoCast.RenderPath
 
+/-! Genre-agnostic identity/change helpers and document-to-React traversal.
+The client-facing hooks and styles are re-exported from `Renderer.Config`. -/
 public section
 
 namespace VersoCast.Renderer
@@ -26,126 +25,6 @@ open Verso.Doc
 
 variable {g : Doc.Genre}
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
-
-namespace Style
-
-private def vscodeColor (name fallback : String) : String :=
-  "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
-
-private def border (color : String) : String :=
-  "1px solid " ++ color
-
-def foreground : String := vscodeColor "editor-foreground" "#24292f"
-def muted : String := vscodeColor "descriptionForeground" "#57606a"
-def background : String := vscodeColor "editor-background" "#ffffff"
-def codeBackground : String := vscodeColor "textCodeBlock-background" "#f6f8fa"
-def borderColor : String := vscodeColor "panel-border" "#d0d7de"
-
-def document : ReactM (Js Props) := js%{ "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0"), "padding" := (← js#"10px 12px"), "border" := (← JsValue.ofString (border borderColor)), "borderRadius" := (← js#"6px"), "background" := (← JsValue.ofString background), "color" := (← JsValue.ofString foreground), "colorScheme" := (← js#"light dark"), "fontFamily" := (← js#"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"), "overflowWrap" := (← js#"anywhere") }
-def part : ReactM (Js Props) := js%{ "display" := (← js#"grid"), "gap" := (← js#"10px"), "minWidth" := (← js#"0") }
-def heading : ReactM (Js Props) := js%{ "margin" := (← js#"0"), "fontSize" := (← js#"1.12rem"), "lineHeight" := (← js#"1.3") }
-def paragraph : ReactM (Js Props) := js%{ "margin" := (← js#"0"), "lineHeight" := (← js#"1.5") }
-def list : ReactM (Js Props) := js%{ "display" := (← js#"grid"), "gap" := (← js#"6px"), "margin" := (← js#"0"), "paddingLeft" := (← js#"1.5rem") }
-def listItem : ReactM (Js Props) := js%{ "paddingLeft" := (← js#"0.15rem") }
-def blockquote : ReactM (Js Props) := js%{ "display" := (← js#"grid"), "gap" := (← js#"8px"), "margin" := (← js#"0"), "padding" := (← js#"2px 0 2px 12px"), "borderLeft" := (← JsValue.ofString (border borderColor)), "color" := (← JsValue.ofString muted) }
-def descriptionList : ReactM (Js Props) := js%{ "display" := (← js#"grid"), "gridTemplateColumns" := (← js#"max-content minmax(0, 1fr)"), "gap" := (← js#"6px 10px"), "margin" := (← js#"0") }
-def descriptionTerm : ReactM (Js Props) := js%{ "fontWeight" := (← js#"700") }
-def descriptionValue : ReactM (Js Props) := js%{ "margin" := (← js#"0") }
-def inlineCode : ReactM (Js Props) := js%{ "padding" := (← js#"0.08em 0.3em"), "borderRadius" := (← js#"3px"), "background" := (← JsValue.ofString codeBackground), "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"), "fontSize" := (← js#"0.92em") }
-def codeBlock : ReactM (Js Props) := js%{ "margin" := (← js#"0"), "padding" := (← js#"9px 10px"), "overflow" := (← js#"auto"), "borderRadius" := (← js#"5px"), "background" := (← JsValue.ofString codeBackground), "fontFamily" := (← js#"ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"), "fontSize" := (← js#"0.78rem"), "lineHeight" := (← js#"1.45"), "whiteSpace" := (← js#"pre") }
-def mathInline : ReactM (Js Props) := js%{ "padding" := (← js#"0 0.08em"), "fontFamily" := (← js#"KaTeX_Main, Cambria Math, STIX Two Math, serif"), "fontSize" := (← js#"1.02em"), "whiteSpace" := (← js#"pre-wrap") }
-def mathDisplay : ReactM (Js Props) := js%{ "display" := (← js#"block"), "padding" := (← js#"8px 10px"), "overflowX" := (← js#"auto"), "borderRadius" := (← js#"5px"), "background" := (← JsValue.ofString codeBackground), "fontFamily" := (← js#"KaTeX_Main, Cambria Math, STIX Two Math, serif"), "fontSize" := (← js#"1.02em"), "lineHeight" := (← js#"1.5"), "textAlign" := (← js#"center"), "whiteSpace" := (← js#"pre-wrap") }
-def unsupported : ReactM (Js Props) := js%{ "padding" := (← js#"7px 9px"), "border" := (← JsValue.ofString (border borderColor)), "borderRadius" := (← js#"5px"), "color" := (← JsValue.ofString muted) }
-
-end Style
-
-/-- Constant styles owned by one component factory. Treat these objects as read-only;
-node attributes remain fresh. CSS variables keep theme changes independent of React updates. -/
-structure Styles where
-  strings : JsStrings.Fixed
-  document : Js Props
-  part : Js Props
-  heading : Js Props
-  paragraph : Js Props
-  list : Js Props
-  listItem : Js Props
-  blockquote : Js Props
-  descriptionList : Js Props
-  descriptionTerm : Js Props
-  descriptionValue : Js Props
-  inlineCode : Js Props
-  codeBlock : Js Props
-  mathInline : Js Props
-  mathDisplay : Js Props
-  unsupported : Js Props
-
-def Styles.create : ReactM Styles := do
-  return {
-    strings := ← JsStrings.Fixed.create
-    document := ← Style.document, part := ← Style.part, heading := ← Style.heading
-    paragraph := ← Style.paragraph, list := ← Style.list, listItem := ← Style.listItem
-    blockquote := ← Style.blockquote, descriptionList := ← Style.descriptionList
-    descriptionTerm := ← Style.descriptionTerm, descriptionValue := ← Style.descriptionValue
-    inlineCode := ← Style.inlineCode, codeBlock := ← Style.codeBlock
-    mathInline := ← Style.mathInline, mathDisplay := ← Style.mathDisplay
-    unsupported := ← Style.unsupported
-  }
-
-/-- A replacement heading receives the level, fresh attributes and title nodes. -/
-abbrev HeaderRenderer := Nat → Js Props → Array (Js Node) → ReactM (Js Node)
-
-/--
-Application-owned genre renderers. Unhandled extensions remain visible together
-with their children. Callbacks may return ordinary component nodes, but are not
-hook scopes. Children are lazy: call at most once, and return `some` after using
-them. Returning `none` delegates to fallback rendering. Inline renderers must
-produce phrasing content, so paragraphs remain valid HTML.
--/
-structure Renderers (g : Doc.Genre) where
-  /-- Optional stable leaf component. It receives source, mode and caller attributes. -/
-  mathComponent? : Option (FunctionComponent Props) := none
-  /-- Replace an inline extension using its sibling-local React key (not a source path),
-  or return `none` for the visible fallback. -/
-  renderInline? : (key : String) → g.Inline →
-      (children : Unit → ReactM (Array (Js Node))) → ReactM (Option (Js Node)) :=
-    fun _ _ _ => pure none
-  /--
-  Replace a block extension, or return `none` for the visible fallback.
-  `attributes kind style` supplies the existing key, identity, focus and change
-  markers. Call `children ()` once when needed; hidden blocks can skip it.
-  -/
-  renderBlock? : (key : String) → (attributes : String → Js Props → ReactM (Js Props)) →
-      g.Block → (children : Unit → ReactM (Array (Js Node))) →
-      ReactM (Option (Js Node)) :=
-    fun _ _ _ _ => pure none
-  /-- Optional semantic identity; sibling duplicates are disambiguated by the renderer. -/
-  blockIdentity? : g.Block → Option String := fun _ => none
-  /-- Optional content identities; basic rendering uses positional keys. -/
-  fingerprint : Fingerprint.Value g → Option String := fun _ => none
-  /-- Names used only in visible unsupported-extension placeholders. -/
-  inlineName : g.Inline → String := fun _ => "unknown"
-  blockName : g.Block → String := fun _ => "unknown"
-  /-- Customize metadata-bearing parts without copying section traversal.
-  The part has its own metadata removed; descendant metadata is preserved.
-  `renderDefault none` uses the normal heading. A custom heading receives its
-  level, fresh key/focus/change props, and rendered title. It must return an hN
-  at that level (clamped to h6). Call the default at most once and return `some`.
-  No child or title rendering has happened before this callback. -/
-  renderPart? : (key : String) → g.PartMetadata →
-      (part : Doc.Part g) →
-      (renderDefault : Option HeaderRenderer → ReactM (Js Node)) → ReactM (Option (Js Node)) :=
-    fun _ _ _ _ => pure none
-
-/-- An exact native attribute pair. Cache keys/values in the component factory.
-The renderer borrows values and writes only to its own fresh props object. -/
-structure Attribute where
-  name : Js String
-  value : Js.Any
-
-/-- Build a field while widening only the value's phantom shape. No value
-conversion, native allocation or host call; the small Lean record can be cached. -/
-@[inline] def Attribute.of {α : Type} (name : Js String) (value : Js α) : Attribute :=
-  { name, value := by unfold Js.Any Js at *; exact value }
 
 private def applyAttributes (props : Js Props) (attributes : Array Attribute) : ReactM Unit := do
   for field in attributes do
@@ -705,21 +584,6 @@ private partial def renderPart (styles : Styles) (renderers : Renderers g) (fing
   Js.Object.set props styles.strings.keys.dataVersoIdentityOrigin (identity.origin.jsLabel styles.strings)
   Js.Object.set props styles.strings.keys.title (← JsValue.ofString s!"render path: {identity.debugPath}\nidentity: {identity.friendlyId} ({identity.origin.label})")
   return ← <section @props={props}>{pure heading}{Js.Array.ofArray content}{Js.Array.ofArray subParts}</section>
-
-/-- Options computed by the stateful component before constructing the Verso VDOM. -/
-structure Options (g : Doc.Genre) where
-  changedIds : Array String := #[]
-  /-- Source-navigation address, separate from React keys. It marks matching
-  blocks/headings or list items. Fragments mark their visible child roots;
-  a description-item address marks both term and value, whose own addresses
-  select them separately. Hidden/missing addresses do not select a substitute.
-  No DOM focus or scrolling is performed. -/
-  focus : Option String := none
-  /-- Later attributes override style/class defaults, never mutate their values.
-  Cast's diagnostic data attributes are reserved and written last. -/
-  attributes : Array Attribute := #[]
-  /-- Override the adapter identity policy, e.g. with a prepared state key. -/
-  fingerprint? : Option (Fingerprint.Value g → Option String) := none
 
 /-- Construct a native React subtree for any Verso genre. No JSON or equality instances are required. -/
 def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})

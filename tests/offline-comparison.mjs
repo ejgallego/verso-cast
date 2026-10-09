@@ -89,9 +89,9 @@ try {
   await writeFile(resolve(directory, "cast.html"), cast);
   await writeFile(resolve(directory, "verso.html"), standard);
   await stageProgram("+VersoCastTests.Offline:vir", directory);
-  await copyFile(resolve(root, "web/fixture.svg"), resolve(directory, "fixture.svg"));
+  await copyFile(resolve(root, "tests/browser/fixture.svg"), resolve(directory, "fixture.svg"));
   await build({
-    absWorkingDir: root, entryPoints: ["web/comparison.mjs"],
+    absWorkingDir: root, entryPoints: ["tests/browser/comparison.mjs"],
     outfile: resolve(directory, "comparison.js"), bundle: true, format: "esm", target: "es2022",
   });
   const comparison = `<!doctype html><html lang="en"><meta charset="utf-8">

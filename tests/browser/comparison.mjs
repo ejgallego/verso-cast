@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { openReactRuntime } from "./runtime.mjs";
+import { openReactRuntime } from "../../tools/browser-runtime.mjs";
 
 const status = document.getElementById("live-status");
 try {

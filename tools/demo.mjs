@@ -27,9 +27,9 @@ export async function stageProgram(target, output) {
 
 export async function stageDemo() {
   const output = await stageProgram("+VersoCastDemo:vir", resolve(root, "_out/demo"));
-  await copyFile(resolve(root, "web/index.html"), resolve(output, "index.html"));
+  await copyFile(resolve(root, "examples/browser/index.html"), resolve(output, "index.html"));
   await build({
-    absWorkingDir: root, entryPoints: ["web/main.mjs"],
+    absWorkingDir: root, entryPoints: ["examples/browser/main.mjs"],
     outfile: resolve(output, "app.js"), bundle: true, format: "esm", target: "es2022",
   });
   return output;

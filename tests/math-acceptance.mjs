@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import katex from "katex";
 import { build } from "esbuild";
 import { chromium } from "playwright";
-import { createMathComponent } from "../web/katex.mjs";
+import { createMathComponent } from "verso-cast/katex";
 import { stageProgram, serveDemo } from "../tools/demo.mjs";
 import { openTestRuntime, root } from "./runtime.mjs";
 
@@ -48,7 +48,7 @@ console.log("Math SSR: document injection, inline/display, malformed recovery, e
 
 const directory = resolve(root, "_out/math");
 await stageProgram("+VersoCastTests.Math:vir", directory);
-await build({ absWorkingDir: root, entryPoints: ["web/math.mjs"],
+await build({ absWorkingDir: root, entryPoints: ["tests/browser/math.mjs"],
   outfile: resolve(directory, "app.js"), bundle: true, format: "esm", target: "es2022",
   loader: { ".woff2": "file", ".woff": "file", ".ttf": "file" } });
 await writeFile(resolve(directory, "index.html"), `<!doctype html><html lang="en"><meta charset="utf-8">

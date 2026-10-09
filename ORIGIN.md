@@ -23,7 +23,7 @@ inline markup, description-list halves accept their own focus addresses, and
 initial change paths no longer require equality instances. Change comparison
 remains coarse for lists/quotes; its count describes snapshots, not visible DOM.
 
-The optional `web/katex.mjs` leaf replaces the old effect-only integration with
+The optional `js/katex.mjs` leaf replaces the old effect-only integration with
 render-time HTML/MathML, usable by both live React and offline SSR. It does not
 interpret `data-bp-tex-prelude`; Blueprint source/prelude policy stays in VBP.
 The core Lean renderer remains usable without npm or KaTeX.

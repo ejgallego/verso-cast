@@ -8,8 +8,8 @@ import { root } from "./runtime.mjs";
 
 const directory = resolve(root, "_out/retention");
 await stageProgram("+VersoCastTests.Retention:vir", directory);
-await copyFile(resolve(root, "web/index.html"), resolve(directory, "index.html"));
-await build({ absWorkingDir: root, entryPoints: ["web/retention.mjs"],
+await copyFile(resolve(root, "examples/browser/index.html"), resolve(directory, "index.html"));
+await build({ absWorkingDir: root, entryPoints: ["tests/browser/retention.mjs"],
   outfile: resolve(directory, "app.js"), bundle: true, format: "esm", target: "es2022" });
 const { server, url } = await serveDemo(directory);
 let browser;

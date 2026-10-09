@@ -74,8 +74,8 @@ try {
 
 const directory = resolve(root, "_out/navigation");
 await stageProgram("+VersoCastTests.Navigation:vir", directory);
-await copyFile(resolve(root, "web/index.html"), resolve(directory, "index.html"));
-await build({ absWorkingDir: root, entryPoints: ["web/navigation.mjs"],
+await copyFile(resolve(root, "examples/browser/index.html"), resolve(directory, "index.html"));
+await build({ absWorkingDir: root, entryPoints: ["tests/browser/navigation.mjs"],
   outfile: resolve(directory, "app.js"), bundle: true, format: "esm", target: "es2022" });
 const { server, url } = await serveDemo(directory);
 let browser;

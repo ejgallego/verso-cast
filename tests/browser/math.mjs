@@ -2,8 +2,8 @@ import { createElement, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import katex from "katex";
 import "katex/dist/katex.css";
-import { createMathComponent } from "./katex.mjs";
-import { openReactRuntime } from "./runtime.mjs";
+import { createMathComponent } from "verso-cast/katex";
+import { openReactRuntime } from "../../tools/browser-runtime.mjs";
 
 const runtime = await openReactRuntime();
 let root;

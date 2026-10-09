@@ -2,9 +2,17 @@
   "name": "verso-cast",
   "version": "0.1.0",
   "private": true,
+  "description": "Genre-agnostic Verso document rendering with native React through VIR",
   "type": "module",
   "license": "Apache-2.0",
+  "exports": {
+    "./katex": "./js/katex.mjs"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  },
   "scripts": {
+    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:math",
     "test:renderer": "node tests/render-acceptance.mjs",
     "test:widget": "node tests/widget-browser.mjs",
     "test:identity": "node tests/identity-browser.mjs",
