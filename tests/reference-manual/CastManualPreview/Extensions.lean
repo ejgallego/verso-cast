@@ -15,29 +15,39 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
   let calloutStyle ← js%{ "border" := (← js#"1px solid var(--vscode-panel-border, #d0d7de)"),
     "borderRadius" := (← js#"5px"), "padding" := (← js#"8px 10px") }
   let summaryStyle ← js%{ "fontWeight" := (← js#"600"), "cursor" := (← js#"pointer") }
-  return { base with renderBlock? := fun key attributes ext children => do
-    if ext.name == `Manual.proofState then
-      let .ok ((_, goals) : Option String × Array
-          (SubVerso.Highlighting.Highlighted.Goal SubVerso.Highlighting.Highlighted)) :=
-        Lean.fromJson? ext.data | return none
-      let text := if goals.isEmpty then "All goals completed! 🐙"
-        else "\n\n".intercalate (goals.toList.map (·.toString))
-      let props ← attributes "proof-state" styles.codeBlock
-      return some (← <pre @props={props}><code>{ProofWidgets.Html.text text}</code></pre>)
-    else if ext.name == `Manual.example then
-      -- Raw and traversed forms both have five fields. Tag/link fields are
-      -- intentionally not interpreted: this preview has no reference traversal.
-      let .ok ((description, _, opened, _, _) : String × Option String × Bool ×
-          Option Lean.Json × Option String) := Lean.fromJson? ext.data | return none
-      let nodes ← children ()
-      let props ← attributes "example" calloutStyle
-      -- Set the initial browser-owned disclosure state, not React-controlled
-      -- state; unchanged attributes preserve user toggles across parent updates.
-      if opened then Js.Object.set props (← js#"open") (← JsValue.ofBool true)
-      return some (← <details @props={props}>
-        <summary style={summaryStyle}>{ProofWidgets.Html.text description}</summary>
-        <div style={styles.part}>{Js.Array.ofArray (nodes.extract 1 nodes.size)}</div>
-      </details>)
-    else base.renderBlock? key attributes ext children }
+  let keywordStyle ← js%{ "fontFamily" := (← js#"var(--vscode-editor-font-family, ui-monospace, monospace)"),
+    "fontWeight" := (← js#"600"), "color" := (← js#"var(--vscode-symbolIcon-keywordForeground, #8250df)") }
+  return { base with
+    renderInline? := fun key ext children => do
+      if ext.name == `Manual.keywordOf then
+        let .ok ((word, _, _, _) : String × Option Lean.Name × Lean.Name × Option String) :=
+          Lean.fromJson? ext.data | return none
+        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text word}</code>)
+      else base.renderInline? key ext children
+    renderBlock? := fun key attributes ext children => do
+      if ext.name == `Manual.proofState then
+        let .ok ((_, goals) : Option String × Array
+            (SubVerso.Highlighting.Highlighted.Goal SubVerso.Highlighting.Highlighted)) :=
+          Lean.fromJson? ext.data | return none
+        let text := if goals.isEmpty then "All goals completed! 🐙"
+          else "\n\n".intercalate (goals.toList.map (·.toString))
+        let props ← attributes "proof-state" styles.codeBlock
+        return some (← <pre @props={props}><code>{ProofWidgets.Html.text text}</code></pre>)
+      else if ext.name == `Manual.example then
+        -- Raw and traversed forms both have five fields. Tag/link fields are
+        -- intentionally not interpreted: this preview has no reference traversal.
+        let .ok ((description, _, opened, _, _) : String × Option String × Bool ×
+            Option Lean.Json × Option String) := Lean.fromJson? ext.data | return none
+        let nodes ← children ()
+        let props ← attributes "example" calloutStyle
+        -- Set the initial browser-owned disclosure state, not React-controlled
+        -- state; unchanged attributes preserve user toggles across parent updates.
+        if opened then Js.Object.set props (← js#"open") (← JsValue.ofBool true)
+        return some (← <details @props={props}>
+          <summary style={summaryStyle}>{ProofWidgets.Html.text description}</summary>
+          <div style={styles.part}>{Js.Array.ofArray (nodes.extract 1 nodes.size)}</div>
+        </details>)
+      else base.renderBlock? key attributes ext children }
 
 end CastManualPreview.Extensions

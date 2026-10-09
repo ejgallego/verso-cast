@@ -40,7 +40,7 @@ Each npm test below can be run with `npm run <name>`.
 | `test:navigation` | Focus addresses, fragments, description lists and independent change markers |
 | `test:widget`, `test:showcase` | Live component state, callbacks, retained DOM and disposal |
 | `test:math` | KaTeX SSR/live output, updates, malformed input and macro isolation |
-| `test:manual` | Lean source/output, severity, summaries, escaping and fallback |
+| `test:manual` | Styled source/output, inline Lean, docstring sections, diagnostics, escaping and fallback |
 
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
@@ -115,12 +115,18 @@ This is a raw-document validation mode, not the generated reference website:
 it does not run Manual traversal, resolve references or typeset math. Built-in
 Lean code/output render as text panels; the consumer adds proof-state panels
 and collapsible examples. Example summaries use their plain-text description;
-rich summary markup, syntax colouring and hover information are not implemented.
+rich summary markup and hover information are not implemented. The adapter
+colours stored Lean tokens with cached native styles, formats inline Lean and
+glossary terms, and displays docstring containers and syntax-error diagnostics.
 Unsupported extensions have visible named
 placeholders. The test-only transport uses `ToJson`/`FromJson` and Lean's JSON
 parser, not an optimized codec; its latency is not a renderer benchmark.
 
-The browser replay uses real elaborated Introduction/Empty pages and tests
+The browser replay validates the public Lake facet and runs the retained package
+that the widget RPC would emit, using real elaborated Introduction/Empty pages.
+The widget declares meta/private imports for the Manual implementations it snapshots,
+so those body changes rebuild that package despite ordinary opaque imports.
+The replay tests
 decoding, rendering, page changes, edit refresh, stale replies, malformed input
 recovery and disposal. Its RPC transport is controlled, not a real VS Code/LSP
 connection. Screenshots are written under `_out/reference-manual/`.

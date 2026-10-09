@@ -11,7 +11,8 @@ open Lean.Vir Lean.Vir.React
 
 private def code : Block Genre.Manual := .other {
   name := `Verso.Genre.Manual.InlineLean.Block.lean
-  data := .arr #[toJson (Highlighted.text "def x := \"<script>\"\n"), .arr #[], .null, .null]
+  data := .arr #[toJson (Highlighted.seq #[.token { content := "def", kind := .keyword none none none },
+    .text " x := \"<script>\"\n"]), .arr #[], .null, .null]
 } #[.code "STORED_CHILD_MUST_NOT_RENDER_TWICE"]
 
 private def output (kind : Highlighted.Span.Kind) (summarize : Bool) : Block Genre.Manual := .other {
@@ -29,6 +30,14 @@ private def malformed : Block Genre.Manual := .other {
   let renderers ← VersoCast.Manual.createRenderers styles
   let doc : Part Genre.Manual := .mk #[] "" none
     #[code, output .error false, output .warning true, output .info false, malformed,
+      .para #[.other {
+        name := `Verso.Genre.Manual.InlineLean.Inline.lean
+        data := .arr #[toJson (Highlighted.text "<inline>"), .arr #[]] } #[]],
+      .other { name := `Verso.Genre.Manual.Block.docstringSection, data := toJson "Fields" }
+        #[.para #[.text "documentation children"]],
+      .other {
+        name := `Verso.Genre.Manual.InlineLean.Block.syntaxError
+        data := toJson ("bad <source>", #[Lean.Json.mkObj [("text", toJson "expected term")]]) } #[],
       .other { name := `Unknown.manual, data := .null } #[.para #[.text "unknown children survive"]]] #[]
   VersoCast.Renderer.render styles doc { focus := some "part-root-block-0" } renderers
 

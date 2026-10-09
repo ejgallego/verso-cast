@@ -14,6 +14,7 @@ run(["build", "CastManualPreview", "+Manual.Intro:olean", "+Manual.BasicTypes.Em
 run(["env", "lean", "--run", "cast-preview/ExportPages.lean"]);
 const output = resolve(root, "_out/reference-manual");
 await stageProgram("+CastManualPreview:vir", output, { cwd: manual });
+await copyFile(resolve(manual, ".cast-preview/widget.irpkg"), resolve(output, "widget.irpkg"));
 for (const name of ["intro", "empty"])
   await copyFile(resolve(manual, `.cast-preview/${name}.json`), resolve(output, `${name}.json`));
 await copyFile(resolve(root, "examples/browser/index.html"), resolve(output, "index.html"));
@@ -29,6 +30,7 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(url);
   const heading = name => page.getByRole("heading", { name, exact: true });
   try { await heading("Introduction").waitFor({ timeout: 10000 }); }
@@ -39,10 +41,23 @@ try {
   }
   await page.getByText("Typographical Conventions", { exact: true }).first().waitFor();
   for (const name of ["Verso.Genre.Manual.InlineLean.Block.lean",
-    "Verso.Genre.Manual.InlineLean.Block.leanOutput", "Manual.proofState", "Manual.example"])
+    "Verso.Genre.Manual.InlineLean.Block.leanOutput", "Manual.proofState", "Manual.example",
+    "Verso.Genre.Manual.InlineLean.Block.syntaxError", "Verso.Genre.Manual.Block.docstring",
+    "Verso.Genre.Manual.Block.docstringSection", "Verso.Genre.Manual.Block.constructorSignature"])
     assert.equal((await page.locator("#app").textContent()).includes(`[block extension: ${name}]`), false, name);
   assert.ok(await page.locator('pre[data-verso-kind="lean"]').count());
   assert.ok(await page.locator('pre[data-verso-kind="proof-state"]').count());
+  for (const name of ["Manual.keywordOf", "Verso.Genre.Manual.InlineLean.Inline.lean",
+    "Verso.Genre.Manual.tacticInline", "Verso.Genre.Manual.leanFromMarkdown",
+    "Verso.Genre.Manual.deftech", "Verso.Genre.Manual.tech"])
+    assert.equal((await page.locator("#app").textContent()).includes(`[inline extension: ${name}]`), false, name);
+  const token = page.locator('[data-verso-token="true"]').first();
+  assert.ok(await token.count());
+  const tokenColor = await token.evaluate(node => getComputedStyle(node).color);
+  await page.evaluate(() => document.documentElement.style.setProperty("--vscode-symbolIcon-keywordForeground", "rgb(150, 80, 180)"));
+  assert.equal(await token.evaluate(node => getComputedStyle(node).color), "rgb(150, 80, 180)");
+  await page.evaluate(() => document.documentElement.style.removeProperty("--vscode-symbolIcon-keywordForeground"));
+  assert.equal(await token.evaluate(node => getComputedStyle(node).color), tokenColor);
   const example = page.locator('details[data-verso-kind="example"]').first();
   assert.equal(await example.evaluate(node => node.open), false);
   await example.locator("summary").click();
@@ -68,6 +83,7 @@ try {
   await page.waitForTimeout(100);
   await page.evaluate(() => { window.manualPreview.hold(false); window.manualPreview.select(1); });
   await heading("The Empty Type").waitFor();
+  assert.equal((await page.locator("#app").textContent()).includes("[inline extension: Verso.Genre.Manual.InlineLean.Inline.name]"), false);
   await page.evaluate(() => window.manualPreview.release());
   await page.waitForTimeout(100);
   await heading("The Empty Type").waitFor();

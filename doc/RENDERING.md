@@ -71,8 +71,14 @@ named placeholders and a stateless serialized-content key policy.
 For readable built-in Lean blocks and compiler output, call
 `Manual.createRenderers styles` once in the component factory and pass the
 result to `Renderer.render`. It preserves source text, message severity,
-summary flags and trace-expansion settings. This initial mode has no syntax
-colouring or interactive hover information. Malformed data and unknown
+summary flags and trace-expansion settings. Native token styles also cover
+inline Lean/names, tactic snippets and Markdown Lean; docstring sections and
+constructor signatures render their stored children. Syntax errors show their
+source and diagnostics. Styles are cached in the factory and use VS Code CSS
+variables with browser fallbacks; token colours approximate semantic categories,
+not the editor's full TextMate theme. Interactive hover information is pending.
+Glossary terms render without inventing unresolved cross-reference links.
+Malformed data and unknown
 extensions keep the named fallback. Reference-manual-specific extensions
 (`Manual.example`, `Manual.proofState`) are implemented by the validation
 consumer, not registered globally in Cast.

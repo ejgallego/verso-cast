@@ -5,7 +5,15 @@ import { openTestRuntime } from "./runtime.mjs";
 const { runtime } = await openTestRuntime("+VersoCastTests.Manual:vir");
 try {
   const html = renderToStaticMarkup(runtime.call("VersoCastTests.Manual.render"));
-  assert.match(html, /def x := &quot;&lt;script&gt;&quot;/);
+  assert.match(html.replace(/<[^>]*>/g, ""), /def x := &quot;&lt;script&gt;&quot;/);
+  assert.match(html, /data-verso-token="true"/);
+  assert.match(html, /--vscode-symbolIcon-keywordForeground/);
+  assert.match(html, /--vscode-editor-font-size/);
+  assert.match(html, /&lt;inline&gt;/);
+  assert.match(html, /aria-label="Fields"/);
+  assert.match(html, /documentation children/);
+  assert.match(html, /bad &lt;source&gt;/);
+  assert.match(html, /expected term/);
   assert.match(html, /&lt;img src=x&gt;/);
   assert.doesNotMatch(html, /<script>|<img|MUST_NOT_RENDER_TWICE/);
   for (const severity of ["error", "warning", "info"])

@@ -22,7 +22,7 @@ const session = { call(method, params, options) {
 } };
 const runtime = await createVirRuntime({
   wasmUrl: new URL("runtime.wasm", location.href).href,
-  irPackageSet: new URL("document.irpkg-set.json", location.href).href,
+  irPackageSet: [new Uint8Array(await (await fetch("widget.irpkg")).arrayBuffer())],
   defaultHostBindings: () => createBrowserHostBindings({
     reactHostBindings: createBrowserReactHostBindings,
     infoviewUseRpcSession: () => session,
@@ -32,7 +32,7 @@ const runtime = await createVirRuntime({
     },
   }),
 });
-const View = runtime.call("CastManualPreview.View");
+const View = runtime.call("CastManualPreview.createComponent");
 const root = createRoot(document.getElementById("app"));
 let uri = "file:///Manual/Intro.lean";
 const render = () => root.render(React.createElement(View, { pos: { uri, line: 35, character: 0 } }));

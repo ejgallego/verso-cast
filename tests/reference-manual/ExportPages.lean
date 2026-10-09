@@ -4,6 +4,20 @@ import Manual.Intro
 import Manual.BasicTypes.Empty
 import Verso.Doc.Name
 
+-- Exercise the same retained package that the infoview RPC emits, rather than
+-- only testing a freshly generated :vir facet with potentially newer imports.
+#eval show Lean.CoreM Unit from do
+  let env ← Lean.getEnv
+  let some idx := env.getModuleIdxFor? `CastManualPreview.createComponent
+    | throwError "No manual widget owner"
+  let some (_, _, package) := (Lean.Vir.Infoview.widgetPackages.getModuleEntries env idx).find?
+      (fun (name, _, _) => name == `CastManualPreview.createComponent)
+    | throwError "No retained manual widget package"
+  let .ok bytes := Vir.GeneratePackage.emitPackage package.closure package.manifest
+    | throwError "Could not emit the retained widget package"
+  IO.FS.createDirAll ".cast-preview"
+  IO.FS.writeBinFile ".cast-preview/widget.irpkg" bytes
+
 -- Optional browser-validation inputs: actual elaborated pages, before traversal.
 def main : IO Unit := do
   IO.FS.createDirAll ".cast-preview"

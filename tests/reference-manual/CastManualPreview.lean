@@ -7,6 +7,11 @@ public import Vir.Infoview
 public import Vir.Infoview.Widget
 public meta import Vir.Infoview.Widget
 public meta import CastManualPreview.Server
+-- Widget elaboration snapshots the imported runtime implementations. Ordinary
+-- opaque imports alone do not invalidate that snapshot when bodies change.
+meta import all CastManualPreview.Extensions
+meta import all VersoCast.Manual
+meta import all VersoCast.Manual.Highlighting
 meta import Vir.Attributes
 
 public section
