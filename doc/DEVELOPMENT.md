@@ -84,6 +84,43 @@ universal equivalence requirement. This fixture leaves math as source.
 The math demo uses the shared KaTeX leaf for both live and offline output,
 with editable formula source and display mode.
 
+## Lean reference manual validation
+
+After the normal setup above, prepare an isolated, shallow copy of
+`leanprover/reference-manual` at `349244b4dd2f284728c1dacb621cc74a32f9929b`:
+
+```sh
+node tools/setup-reference-manual.mjs --build
+code --new-window .local/reference-manual --goto .local/reference-manual/Manual/Intro.lean:35
+node tests/reference-manual/browser.test.mjs
+```
+
+The script checks the exact toolchain and shared dependency revisions, reuses
+Cast's built dependencies, and adds the test widget before `#doc` in 205 pages.
+It does not touch another manual checkout. Repeat runs preserve page edits and
+refuse to overwrite changed configuration or test helpers. The checked-in
+[Lake patch](../tests/reference-manual/lakefile.patch) and widget live only in
+test support, not the Cast library.
+
+Place the cursor in a page under `Manual/`. The widget shows that module's
+whole checked document; opening another page changes the preview, and edits
+refresh it through the standard infoview notification/RPC APIs. Setup builds
+Introduction and The Empty Type. Other pages may build imports when first
+opened; to prepare all of them, run `lake build Manual` inside the copy.
+Do not build that copy and Cast concurrently: their dependencies are shared.
+Existing legacy pages may emit a missing-`module` warning; they are not migrated.
+
+This is a raw-document validation mode, not the generated reference website:
+it does not run Manual traversal, resolve references, reproduce its extension
+renderers, or typeset math. Unsupported extensions have visible named
+placeholders. The test-only transport uses `ToJson`/`FromJson` and Lean's JSON
+parser, not an optimized codec; its latency is not a renderer benchmark.
+
+The browser replay uses real elaborated Introduction/Empty pages and tests
+decoding, rendering, page changes, edit refresh, stale replies, malformed input
+recovery and disposal. Its RPC transport is controlled, not a real VS Code/LSP
+connection. Screenshots are written under `_out/reference-manual/`.
+
 ## Runtime assets
 
 `cast-assets` reads `Vir.Resources.Runtime.bundle`, checks the Lean compiler

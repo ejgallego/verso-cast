@@ -9,8 +9,10 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const lake = args => execFileSync("lake", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 
 // One asset-staging path for the small widget and the live comparison.
-export async function stageProgram(target, output) {
-  const descriptor = JSON.parse(lake(["--json", "query", target]));
+export async function stageProgram(target, output, { cwd = root } = {}) {
+  const descriptor = JSON.parse(execFileSync("lake", ["--json", "query", target], {
+    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"],
+  }));
   const packageSet = JSON.parse(await readFile(descriptor, "utf8"));
   await mkdir(output, { recursive: true });
   await copyFile(descriptor, resolve(output, "document.irpkg-set.json"));

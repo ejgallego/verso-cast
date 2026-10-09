@@ -42,4 +42,5 @@ jobs:
         # VIR's widget bundle is built only after root npm tooling is installed.
         run: |
           lake build VersoCastExamples
+          npm run test:reference-setup
           npm test

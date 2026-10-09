@@ -1,0 +1,30 @@
+diff --git a/lakefile.lean b/lakefile.lean
+--- a/lakefile.lean
++++ b/lakefile.lean
+@@ -8,9 +8,11 @@
+ open Lake DSL
+ open System (FilePath)
+
+-require versowebcomponents from git "https://github.com/leanprover/verso-web-components"@"main"
+-require illuminate from git "https://github.com/leanprover/illuminate"@"main"
+-require verso from git "https://github.com/leanprover/verso.git"@"main"
++require versowebcomponents from git "https://github.com/leanprover/verso-web-components"@
++  "863b9bd64f83cf9bdc9d7e1daae097572000883b"
++require illuminate from "../../.lake/packages/illuminate"
++require verso from "../../.lake/packages/verso"
++require «verso-cast» from "../.."
+
+
+ open Lean System in
+@@ -93,6 +95,11 @@
+ @[default_target]
+ lean_lib Tutorial where
+
++-- Optional validation widget; Manual pages remain ordinary Verso sources.
++lean_lib CastManualPreview where
++  srcDir := "cast-preview"
++  requiresModuleSystem := true
++
+ @[default_target]
+ lean_exe "generate-tutorials" where
+   root := `TutorialMain
