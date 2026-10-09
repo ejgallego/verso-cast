@@ -10,6 +10,7 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(url);
   const checkbox = page.getByRole("checkbox", { name: "Show an extra block" });
   await checkbox.check();
@@ -25,8 +26,11 @@ try {
   await page.screenshot({ path: "_out/widget.png", fullPage: true });
   await checkbox.uncheck();
   await page.getByText("This extra block is controlled by React state.").waitFor({ state: "detached" });
-  await page.evaluate(() => window.castDemo.dispose());
+  await page.evaluate(() => { window.castDemo.dispose(); window.castDemo.dispose(); });
   assert.equal(await page.locator("#app").textContent(), "");
+  assert.equal(await page.evaluate(() => {
+    try { window.castDemo.updateProps(21); return false; } catch { return true; }
+  }), true);
   assert.equal(await page.evaluate(() => {
     try { window.castDemo.invokeAfterDisposal(); return false; } catch { return true; }
   }), true);
@@ -37,6 +41,6 @@ try {
   assert.deepEqual(errors, []);
   console.log("Chromium widget: retained state/DOM across 20 updates; callbacks, unmount and disposal PASS");
 } finally {
-  await browser?.close();
-  await new Promise(resolve => server.close(resolve));
+  try { await browser?.close(); }
+  finally { await new Promise(resolve => server.close(resolve)); }
 }

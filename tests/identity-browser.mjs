@@ -1,16 +1,12 @@
 import assert from "node:assert/strict";
-import { copyFile, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { build } from "esbuild";
 import { chromium } from "playwright";
-import { stageProgram, serveDemo } from "../tools/demo.mjs";
+import { stageBrowserDemo, serveDemo } from "../tools/demo.mjs";
 import { root } from "./runtime.mjs";
 
 const directory = resolve(root, "_out/retention");
-await stageProgram("+VersoCastTests.Retention:vir", directory);
-await copyFile(resolve(root, "examples/browser/index.html"), resolve(directory, "index.html"));
-await build({ absWorkingDir: root, entryPoints: ["tests/browser/retention.mjs"],
-  outfile: resolve(directory, "app.js"), bundle: true, format: "esm", target: "es2022" });
+await stageBrowserDemo("+VersoCastTests.Retention:vir", directory, "tests/browser/retention.mjs");
 const { server, url } = await serveDemo(directory);
 let browser;
 try {

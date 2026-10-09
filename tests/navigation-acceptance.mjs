@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
-import { copyFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Children, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { build } from "esbuild";
 import { chromium } from "playwright";
 import { openTestRuntime, root } from "./runtime.mjs";
-import { stageProgram, serveDemo } from "../tools/demo.mjs";
+import { stageBrowserDemo, serveDemo } from "../tools/demo.mjs";
 
 const b = index => `part-root-block-${index}`;
 const fragmentChildren = [`${b(1)}-block-1-block-0`, `${b(1)}-block-1-block-1`, `${b(1)}-block-2`];
@@ -73,10 +71,7 @@ try {
 } finally { runtime.dispose(); }
 
 const directory = resolve(root, "_out/navigation");
-await stageProgram("+VersoCastTests.Navigation:vir", directory);
-await copyFile(resolve(root, "examples/browser/index.html"), resolve(directory, "index.html"));
-await build({ absWorkingDir: root, entryPoints: ["tests/browser/navigation.mjs"],
-  outfile: resolve(directory, "app.js"), bundle: true, format: "esm", target: "es2022" });
+await stageBrowserDemo("+VersoCastTests.Navigation:vir", directory, "tests/browser/navigation.mjs");
 const { server, url } = await serveDemo(directory);
 let browser;
 try {
