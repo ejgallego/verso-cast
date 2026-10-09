@@ -1,5 +1,6 @@
 /.lake/
 /.beam/
+/.vir/
 /node_modules/
 /_out/
 /.local/

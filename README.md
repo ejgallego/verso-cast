@@ -50,19 +50,28 @@ Cursor/control changes need not recompute content identities.
   API (`lake build`) and native execution of its pure identity helpers
   (`lake exe consumer`). These are distinct gates.
 - Real React assertions are in `tests/renderer-assertions.mjs`. Their runner uses
-  VIR's public SDK and host bindings, not a shadow VDOM or copied adapter:
+  the pinned VIR checkout's public npm entry points and host bindings, with the
+  exact published runtime acquired through VIR's Lake resource API:
 
 ```sh
-lake build +VersoCastTests:vir @lean_vir:virSdk
 npm ci
 npm run test:renderer
+npm run test:widget
 ```
 
-The selected VIR revision's default SDK URL currently returns HTTP 404.
-Therefore the React execution gate is **pending SDK availability**, not passed.
-An independently verified matching archive may be supplied through VIR's
-`VIR_SDK_ARCHIVE` option; do not substitute old JavaScript/Wasm or infer compatibility
-from a version label. The Lean build does not need that SDK or npm.
+Run the Lean build before `npm ci`: the local npm dependency points to Lake's
+revision-locked VIR checkout. `cast-assets` uses `Vir.Resources.Runtime.bundle`,
+checks its compiler identity, and writes the declared Wasm payload to
+`.vir/runtime.wasm`. The SSR test also checks its SHA-256. No Wasm source build,
+private runtime adapter or old SDK is used. The legacy `:virSdk` download URL at
+this pin returns HTTP 404; it is not part of this setup.
+
+The Chromium test uses Playwright and the same Lean component as the widget.
+It checks retained checkbox state and paragraph DOM identity through 20 prop
+updates, functional callbacks, unmount and disposal. This is component/browser
+acceptance, not an automated VS Code infoview test or a performance benchmark.
+If Chromium is not installed, run `npx playwright install chromium` first.
+The plain Lean build/test does not require npm or browser assets.
 
 The full renderer is browser/VIR code, not a native HTML generator. Native C
 compilation of the renderer currently reaches VIR host marker externs such as
@@ -72,12 +81,33 @@ whole import is not qualified. No consumer-side stubs or marker rewrite is added
 
 ## Small widget boundary
 
-Pinned VIR offers `Vir.Infoview.Widget` and `vir_proof_widget` for a native-props
-component factory. This is the candidate for a small example, not a reason to
-copy VBP's full shell. Its generated infoview bundle and exact matching Wasm
-assets need separate qualification before claiming a live demo. The simpler
-`createProgram` resource facade does not accept custom React host bindings.
-No local widget bridge, JSON converter or provider abstraction is added here.
+`examples/VersoCastDemo.lean` uses VIR's native-props `vir_proof_widget` mechanism:
+one Manual document, one retained checkbox, and no custom server/RPC/shell. The
+factory constructs styles once. Its registration and generated IR build pass;
+live VS Code display remains a manual acceptance step.
+
+After `lake build` and `npm ci`:
+
+```sh
+lake exe cast-assets
+lake build VersoCastExamples
+code .
+```
+
+Open `examples/VersoCastDemo.lean` and place the cursor inside `castDemo_and_comm`.
+The Lean extension's infoview loads VIR's dependency-owned widget module and the
+prepared Wasm. No local widget bridge, JSON converter or provider abstraction is
+added. The simpler `createProgram` resource facade cannot accept React host
+bindings, so this experimental UI uses VIR's public custom-host APIs.
+
+For a standalone browser view of the same component:
+
+```sh
+npm run demo
+```
+
+Open the printed local URL. The server serves only generated `_out/demo` files;
+stop it with Ctrl-C. Math is source-preserving in this first example.
 
 See [ORIGIN.md](ORIGIN.md) for extraction provenance and deliberately excluded
 experiments. VBP retains Blueprint adaptation and widget/application policy.

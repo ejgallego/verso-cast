@@ -17,3 +17,14 @@ lean_lib VersoCast where
 lean_lib VersoCastTests where
   srcDir := "tests"
   requiresModuleSystem := true
+
+-- Test/demo assets come from VIR's locked resource, not a locally built Wasm.
+lean_exe «cast-assets» where
+  srcDir := "tests"
+  root := `PrepareAssets
+
+-- Optional live example; the renderer library does not import Infoview.
+lean_lib VersoCastExamples where
+  srcDir := "examples"
+  roots := #[`VersoCastDemo]
+  requiresModuleSystem := true

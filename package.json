@@ -5,9 +5,14 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "test:renderer": "node tests/render-acceptance.mjs"
+    "test:renderer": "node tests/render-acceptance.mjs",
+    "test:widget": "node tests/widget-browser.mjs",
+    "demo": "node tools/demo.mjs"
   },
   "devDependencies": {
+    "esbuild": "0.27.7",
+    "lean-vir": "file:.lake/packages/lean_vir",
+    "playwright": "1.58.0",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   }
