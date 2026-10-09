@@ -5,4 +5,5 @@
 /_out/
 /.local/
 /tests/downstream/.lake/
+/tests/downstream/.beam/
 /tests/downstream/lake-manifest.json

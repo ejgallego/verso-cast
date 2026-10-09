@@ -23,6 +23,11 @@ lean_exe «cast-assets» where
   srcDir := "tests"
   root := `PrepareAssets
 
+-- Pure Verso backend for the illustrative offline comparison (no VIR host externs).
+lean_exe «cast-standard-html» where
+  srcDir := "tests"
+  root := `OfflineComparison
+
 -- Optional live example; the renderer library does not import Infoview.
 lean_lib VersoCastExamples where
   srcDir := "examples"

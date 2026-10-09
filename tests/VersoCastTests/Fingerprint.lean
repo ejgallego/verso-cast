@@ -2,11 +2,15 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Fingerprint
+public import VersoManual.Basic
 meta import VersoCast.Fingerprint
 
 public section
 namespace VersoCastTests.Fingerprint
 open Verso VersoCast.Fingerprint
+
+private abbrev Value := VersoCast.Fingerprint.Value Genre.Manual
+private abbrev State := VersoCast.Fingerprint.State Genre.Manual
 
 private def paragraph (text : String) : Value := .inl (.para #[.text text])
 

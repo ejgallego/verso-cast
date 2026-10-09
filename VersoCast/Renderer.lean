@@ -8,7 +8,7 @@ module
 
 public import Vir.React
 public import Vir.ProofWidgets.Jsx
-public import VersoManual.Basic
+public import Verso.Doc
 public import VersoCast.RenderPath
 public import VersoCast.Fingerprint
 public import VersoCast.JsStrings
@@ -22,6 +22,9 @@ open Lean.Vir
 open Lean.Vir.React
 open Lean.Doc.Syntax
 open _root_.Verso
+open Verso.Doc
+
+variable {g : Doc.Genre}
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
 namespace Style
@@ -88,29 +91,65 @@ def Styles.create : ReactM Styles := do
     unsupported := ← Style.unsupported
   }
 
+/-- A replacement heading receives the level, fresh attributes and title nodes. -/
+abbrev HeaderRenderer := Nat → Js Props → Array (Js Node) → ReactM (Js Node)
+
 /--
-Application-owned Manual extensions. Unhandled extensions remain visible together
-with their children. The callbacks construct ordinary React nodes, not components
-or hook scopes. Children are lazy so hidden extensions need not render them.
+Application-owned genre renderers. Unhandled extensions remain visible together
+with their children. Callbacks may return ordinary component nodes, but are not
+hook scopes. Children are lazy: call at most once, and return `some` after using
+them. Returning `none` delegates to fallback rendering. Inline renderers must
+produce phrasing content, so paragraphs remain valid HTML.
 -/
-structure Extensions where
+structure Renderers (g : Doc.Genre) where
   /-- Optional stable leaf component. It receives source, mode and caller attributes. -/
   mathComponent? : Option (FunctionComponent Props) := none
   /-- Replace an inline extension using its sibling-local React key (not a source path),
   or return `none` for the visible fallback. -/
-  renderInline? : (key : String) → Genre.Manual.Inline → ReactM (Option (Js Node)) :=
-    fun _ _ => pure none
+  renderInline? : (key : String) → g.Inline →
+      (children : Unit → ReactM (Array (Js Node))) → ReactM (Option (Js Node)) :=
+    fun _ _ _ => pure none
   /--
   Replace a block extension, or return `none` for the visible fallback.
   `attributes kind style` supplies the existing key, identity, focus and change
   markers. Call `children ()` once when needed; hidden blocks can skip it.
   -/
   renderBlock? : (key : String) → (attributes : String → Js Props → ReactM (Js Props)) →
-      Genre.Manual.Block → (children : Unit → ReactM (Array (Js Node))) →
+      g.Block → (children : Unit → ReactM (Array (Js Node))) →
       ReactM (Option (Js Node)) :=
     fun _ _ _ _ => pure none
   /-- Optional semantic identity; sibling duplicates are disambiguated by the renderer. -/
-  blockIdentity? : Genre.Manual.Block → Option String := fun _ => none
+  blockIdentity? : g.Block → Option String := fun _ => none
+  /-- Optional content identities; basic rendering uses positional keys. -/
+  fingerprint : Fingerprint.Value g → Option String := fun _ => none
+  /-- Names used only in visible unsupported-extension placeholders. -/
+  inlineName : g.Inline → String := fun _ => "unknown"
+  blockName : g.Block → String := fun _ => "unknown"
+  /-- Customize metadata-bearing parts without copying section traversal.
+  The part has its own metadata removed; descendant metadata is preserved.
+  `renderDefault none` uses the normal heading. A custom heading receives its
+  level, fresh key/focus/change props, and rendered title. It must return an hN
+  at that level (clamped to h6). Call the default at most once and return `some`.
+  No child or title rendering has happened before this callback. -/
+  renderPart? : (key : String) → g.PartMetadata →
+      (part : Doc.Part g) →
+      (renderDefault : Option HeaderRenderer → ReactM (Js Node)) → ReactM (Option (Js Node)) :=
+    fun _ _ _ _ => pure none
+
+/-- An exact native attribute pair. Cache keys/values in the component factory.
+The renderer borrows values and writes only to its own fresh props object. -/
+structure Attribute where
+  name : Js String
+  value : Js.Any
+
+/-- Build a field while widening only the value's phantom shape. No value
+conversion, native allocation or host call; the small Lean record can be cached. -/
+@[inline] def Attribute.of {α : Type} (name : Js String) (value : Js α) : Attribute :=
+  { name, value := by unfold Js.Any Js at *; exact value }
+
+private def applyAttributes (props : Js Props) (attributes : Array Attribute) : ReactM Unit := do
+  for field in attributes do
+    Js.Construction.field props field.name field.value
 
 private inductive IdentityOrigin where
   | structural
@@ -135,7 +174,7 @@ private def IdentityOrigin.jsLabel (strings : JsStrings.Fixed) : IdentityOrigin 
   | .positional => strings.values.positional
 
 /--
-Identity sources are ordered from strongest to weakest. Ordinary Manual blocks
+Identity sources are ordered from strongest to weakest. Content-keyed blocks
 reach the fingerprint branch; extension metadata can provide stronger semantic
 identities where the application owns their meaning.
 -/
@@ -199,71 +238,71 @@ private def allocateSiblingIdentities
     }
   return identities
 
-private partial def blockIdentitySource (extensions : Extensions)
-    (block : _root_.Verso.Doc.Block Genre.Manual) : String ⊕ Doc.Block Genre.Manual :=
+private partial def blockIdentitySource (renderers : Renderers g)
+    (block : _root_.Verso.Doc.Block g) : String ⊕ Doc.Block g :=
   match block with
   | .concat content =>
       if content.size == 1 then
-        blockIdentitySource extensions content[0]!
+        blockIdentitySource renderers content[0]!
       else
         .inr block
   | .other extension _ =>
-      match extensions.blockIdentity? extension with
+      match renderers.blockIdentity? extension with
       | some identity => .inl identity
       | none => .inr block
   | _ => .inr block
 
-private def blockIdentityHints (extensions : Extensions) (block : Doc.Block Genre.Manual)
-    (fingerprint : Fingerprint.Value → String) : IdentityHints :=
-  match blockIdentitySource extensions block with
+private def blockIdentityHints (renderers : Renderers g) (block : Doc.Block g)
+    (fingerprint : Fingerprint.Value g → Option String) : IdentityHints :=
+  match blockIdentitySource renderers block with
   | .inl identity => { explicitId? := some identity }
-  | .inr block => { fingerprint? := some (fingerprint (.inl block)) }
+  | .inr block => { fingerprint? := fingerprint (.inl block) }
 
 private def partIdentityHints
-    (part : _root_.Verso.Doc.Part Genre.Manual)
-    (fingerprint : Fingerprint.Value → String) : IdentityHints :=
+    (part : _root_.Verso.Doc.Part g)
+    (fingerprint : Fingerprint.Value g → Option String) : IdentityHints :=
   -- A section title identifies the section without coupling its key to body edits.
-  { fingerprint? := some (fingerprint (.inr part.title)) }
+  { fingerprint? := fingerprint (.inr part.title) }
 
-private def blockIdentities (extensions : Extensions)
+private def blockIdentities (renderers : Renderers g)
     (parentSemanticKey debugParent : String)
-    (blocks : Array (_root_.Verso.Doc.Block Genre.Manual))
-    (fingerprint : Fingerprint.Value → String := Fingerprint.canonicalKey) : Array Identity :=
+    (blocks : Array (_root_.Verso.Doc.Block g))
+    (fingerprint : Fingerprint.Value g → Option String := renderers.fingerprint) : Array Identity :=
   allocateSiblingIdentities parentSemanticKey debugParent "block" "block"
-    (blocks.map (fun block => blockIdentityHints extensions block fingerprint))
+    (blocks.map (fun block => blockIdentityHints renderers block fingerprint))
 
-private def partIdentities
+private def partIdentities (renderers : Renderers g)
     (parentSemanticKey debugParent : String)
-    (parts : Array (_root_.Verso.Doc.Part Genre.Manual))
-    (fingerprint : Fingerprint.Value → String := Fingerprint.canonicalKey) : Array Identity :=
+    (parts : Array (_root_.Verso.Doc.Part g))
+    (fingerprint : Fingerprint.Value g → Option String := renderers.fingerprint) : Array Identity :=
   allocateSiblingIdentities parentSemanticKey debugParent "part" "part"
     (parts.map (fun part => partIdentityHints part fingerprint))
 
-private partial def appendFingerprintValues (extensions : Extensions)
-    (values : Array Fingerprint.Value) (block : Doc.Block Genre.Manual) : Array Fingerprint.Value := Id.run do
-  let values := match blockIdentitySource extensions block with
+private partial def appendFingerprintValues (renderers : Renderers g)
+    (values : Array (Fingerprint.Value g)) (block : Doc.Block g) : Array (Fingerprint.Value g) := Id.run do
+  let values := match blockIdentitySource renderers block with
     | .inl _ => values
     | .inr value => values.push (.inl value)
   match block with
   | .para _ | .code _ => return values
   | .concat blocks | .blockquote blocks | .other _ blocks =>
-    return blocks.foldl (appendFingerprintValues extensions) values
+    return blocks.foldl (appendFingerprintValues renderers) values
   | .ul items | .ol _ items =>
-    return items.foldl (fun values item => item.contents.foldl (appendFingerprintValues extensions) values) values
+    return items.foldl (fun values item => item.contents.foldl (appendFingerprintValues renderers) values) values
   | .dl items =>
-    return items.foldl (fun values item => item.desc.foldl (appendFingerprintValues extensions) values) values
+    return items.foldl (fun values item => item.desc.foldl (appendFingerprintValues renderers) values) values
 
-private partial def partFingerprintValues (extensions : Extensions)
-    (values : Array Fingerprint.Value) (part : Doc.Part Genre.Manual) : Array Fingerprint.Value :=
-  let values := part.content.foldl (appendFingerprintValues extensions) (values.push (.inr part.title))
-  part.subParts.foldl (partFingerprintValues extensions) values
+private partial def partFingerprintValues (renderers : Renderers g)
+    (values : Array (Fingerprint.Value g)) (part : Doc.Part g) : Array (Fingerprint.Value g) :=
+  let values := part.content.foldl (appendFingerprintValues renderers) (values.push (.inr part.title))
+  part.subParts.foldl (partFingerprintValues renderers) values
 
 /-- Advance one mounted preview's content identities. Explicit labels retain
 their existing policy. Preparation visits document blocks but never renders
 extension children or invokes JavaScript. Retain the result in React state. -/
-def prepareIdentities (previous : Fingerprint.State) (document : Doc.Part Genre.Manual)
-    (extensions : Extensions := {}) : Fingerprint.State :=
-  previous.advance (partFingerprintValues extensions #[] document)
+def prepareIdentities [BEq g.Inline] [BEq g.Block] [Hashable g.Inline] [Hashable g.Block] (previous : Fingerprint.State g) (document : Doc.Part g)
+    (renderers : Renderers g := {}) : Fingerprint.State g :=
+  previous.advance (partFingerprintValues renderers #[] document)
 
 private def rootIdentity : Identity := {
   reactKey := "structural:root"
@@ -281,81 +320,86 @@ private def headingIdentity (part : Identity) : Identity := {
   origin := .structural
 }
 
-private inductive SnapshotValue where
-  | heading (content : Array (_root_.Verso.Doc.Inline Genre.Manual))
-  | block (content : _root_.Verso.Doc.Block Genre.Manual)
-  deriving BEq
+private inductive SnapshotValue (g : Doc.Genre) where
+  | heading (content : Array (_root_.Verso.Doc.Inline g))
+  | block (content : _root_.Verso.Doc.Block g)
 
-private structure Snapshot where
+private instance [BEq g.Inline] [BEq g.Block] : BEq (SnapshotValue g) where
+  beq
+    | .heading left, .heading right => left == right
+    | .block left, .block right => left == right
+    | _, _ => false
+
+private structure Snapshot (g : Doc.Genre) where
   debugPath : String
   semanticKey : String
-  value : SnapshotValue
+  value : SnapshotValue g
 
-private partial def appendBlockSnapshots (extensions : Extensions)
-    (snapshots : Array Snapshot)
-    (identity : Identity) : _root_.Verso.Doc.Block Genre.Manual → Array Snapshot
+private partial def appendBlockSnapshots (renderers : Renderers g)
+    (snapshots : Array (Snapshot g))
+    (identity : Identity) : _root_.Verso.Doc.Block g → Array (Snapshot g)
   | .concat content =>
-      appendChildBlockSnapshots extensions snapshots identity.semanticKey identity.debugPath content
+      appendChildBlockSnapshots renderers snapshots identity.semanticKey identity.debugPath content
   | block@(.other _ content) =>
       let snapshots := snapshots.push {
         debugPath := identity.debugPath
         semanticKey := identity.semanticKey
         value := .block block
       }
-      appendChildBlockSnapshots extensions snapshots identity.semanticKey identity.debugPath content
+      appendChildBlockSnapshots renderers snapshots identity.semanticKey identity.debugPath content
   | block => snapshots.push {
       debugPath := identity.debugPath
       semanticKey := identity.semanticKey
       value := .block block
     }
 where
-  appendChildBlockSnapshots (extensions : Extensions)
-      (snapshots : Array Snapshot)
+  appendChildBlockSnapshots (renderers : Renderers g)
+      (snapshots : Array (Snapshot g))
       (parentSemanticKey debugParent : String)
-      (content : Array (_root_.Verso.Doc.Block Genre.Manual)) : Array Snapshot := Id.run do
-    let identities := blockIdentities extensions parentSemanticKey debugParent content
+      (content : Array (_root_.Verso.Doc.Block g)) : Array (Snapshot g) := Id.run do
+    let identities := blockIdentities renderers parentSemanticKey debugParent content
     let mut snapshots := snapshots
     for index in [:content.size] do
-      snapshots := appendBlockSnapshots extensions snapshots identities[index]! content[index]!
+      snapshots := appendBlockSnapshots renderers snapshots identities[index]! content[index]!
     return snapshots
 
-private partial def appendSnapshots (extensions : Extensions)
-    (snapshots : Array Snapshot)
+private partial def appendSnapshots (renderers : Renderers g)
+    (snapshots : Array (Snapshot g))
     (identity : Identity)
-    (part : _root_.Verso.Doc.Part Genre.Manual) : Array Snapshot := Id.run do
+    (part : _root_.Verso.Doc.Part g) : Array (Snapshot g) := Id.run do
   let heading := headingIdentity identity
   let mut snapshots := snapshots.push {
     debugPath := heading.debugPath
     semanticKey := heading.semanticKey
     value := .heading part.title
   }
-  let blocks := blockIdentities extensions identity.semanticKey identity.debugPath part.content
+  let blocks := blockIdentities renderers identity.semanticKey identity.debugPath part.content
   for index in [:part.content.size] do
-    snapshots := appendBlockSnapshots extensions snapshots blocks[index]! part.content[index]!
-  let subParts := partIdentities identity.semanticKey identity.debugPath part.subParts
+    snapshots := appendBlockSnapshots renderers snapshots blocks[index]! part.content[index]!
+  let subParts := partIdentities renderers identity.semanticKey identity.debugPath part.subParts
   for index in [:part.subParts.size] do
-    snapshots := appendSnapshots extensions snapshots subParts[index]! part.subParts[index]!
+    snapshots := appendSnapshots renderers snapshots subParts[index]! part.subParts[index]!
   return snapshots
 
-private def snapshots (extensions : Extensions) (document : Doc.Part Genre.Manual) : Array Snapshot :=
-  appendSnapshots extensions #[] rootIdentity document
+private def snapshots (renderers : Renderers g) (document : Doc.Part g) : Array (Snapshot g) :=
+  appendSnapshots renderers #[] rootIdentity document
 
 /--
 Renderer paths changed relative to the optional previous document, together
 with the current renderer-node count. The current snapshot tree is collected
 once so change highlighting and diagnostics share the same traversal.
 -/
-def changedBlockIdsAndCount
-    (previous : Option (Doc.Part Genre.Manual))
-    (current : Doc.Part Genre.Manual)
-    (extensions : Extensions := {}) : Array String × Nat :=
-  let currentSnapshots := snapshots extensions current
+def changedBlockIdsAndCount [BEq g.Inline] [BEq g.Block]
+    (previous : Option (Doc.Part g))
+    (current : Doc.Part g)
+    (renderers : Renderers g := {}) : Array String × Nat :=
+  let currentSnapshots := snapshots renderers current
   let changedIds :=
     match previous with
     | none => currentSnapshots.map (·.debugPath)
     | some previous =>
-        let previousByKey := snapshots extensions previous |>.foldl
-          (init := ({} : Std.HashMap String SnapshotValue)) fun entries snapshot =>
+        let previousByKey := snapshots renderers previous |>.foldl
+          (init := ({} : Std.HashMap String (SnapshotValue g))) fun entries snapshot =>
             entries.insert snapshot.semanticKey snapshot.value
         currentSnapshots.filterMap fun snapshot =>
           match previousByKey.get? snapshot.semanticKey with
@@ -364,14 +408,14 @@ def changedBlockIdsAndCount
   (changedIds, currentSnapshots.size)
 
 /-- Structural renderer paths used to highlight a newly mounted document. -/
-def renderBlockIds (document : Doc.Part Genre.Manual)
-    (extensions : Extensions := {}) : Array String :=
-  (changedBlockIdsAndCount none document extensions).1
+def renderBlockIds [BEq g.Inline] [BEq g.Block] (document : Doc.Part g)
+    (renderers : Renderers g := {}) : Array String :=
+  (changedBlockIdsAndCount none document renderers).1
 
 /-- Renderer paths whose semantic nodes are new or changed in `current`. -/
-def changedBlockIds (previous current : Doc.Part Genre.Manual)
-    (extensions : Extensions := {}) : Array String :=
-  (changedBlockIdsAndCount (some previous) current extensions).1
+def changedBlockIds [BEq g.Inline] [BEq g.Block] (previous current : Doc.Part g)
+    (renderers : Renderers g := {}) : Array String :=
+  (changedBlockIdsAndCount (some previous) current renderers).1
 
 private def blockProps
     (styles : Styles)
@@ -412,13 +456,14 @@ private def listItemProps
   pure props
 
 /-- Source-preserving math node with a sibling-local React key;
-callers may add attributes for their typesetter. -/
+caller attributes override style/class defaults. Key/mode and a component's
+source are reserved; caller native values are borrowed and never mutated. -/
 def renderMath
     (styles : Styles)
     (key : String)
     (mode : Lean.Doc.MathMode)
     (source : String)
-    (attributes : Option (Js Props) := none)
+    (attributes : Array Attribute := #[])
     (component? : Option (FunctionComponent Props) := none) : ReactM (Lean.Vir.Js Node) := do
   let modeValue : Js String := match mode with
     | Lean.Doc.MathMode.inline => styles.strings.values.inline
@@ -429,26 +474,19 @@ def renderMath
   let style : Js Props := match mode with
     | Lean.Doc.MathMode.inline => styles.mathInline
     | Lean.Doc.MathMode.display => styles.mathDisplay
-  let props ← match attributes with
-    | some attributes => do
-      Js.Object.set attributes styles.strings.keys.style style
-      pure attributes
-    | none => do
-      let props ← Js.Object.empty
-      Js.Object.set props styles.strings.keys.style style
-      pure props
+  let props ← Js.Object.empty
+  Js.Object.set props styles.strings.keys.style style
+  Js.Object.set props styles.strings.keys.className classValue
+  applyAttributes props attributes
   Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
-  let className ← Js.Object.get props styles.strings.keys.className
-  if ← JsValue.toBool (← Js.UndefinedOr.isUndefined (Js.UndefinedOr.ofJs className)) then
-    Js.Object.set props styles.strings.keys.className classValue
   Js.Object.set props styles.strings.keys.dataVersoMathMode modeValue
   if let some component := component? then
     Js.Object.set props styles.strings.keys.source (← JsValue.ofString source)
     return ← Node.functionComponent component props (← js#[])
   return ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString source)}</code>
 
-private partial def renderInline (styles : Styles) (extensions : Extensions)
-    (key : String) : _root_.Verso.Doc.Inline Genre.Manual → ReactM (Lean.Vir.Js Node)
+private partial def renderInline (styles : Styles) (renderers : Renderers g)
+    (key : String) : _root_.Verso.Doc.Inline g → ReactM (Lean.Vir.Js Node)
   | .text value | .linebreak value => do Node.text (← JsValue.ofString value)
   | .code value => do
       let style := styles.inlineCode
@@ -456,28 +494,32 @@ private partial def renderInline (styles : Styles) (extensions : Extensions)
       Js.Object.set props styles.strings.keys.style style
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
       return ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString value)}</code>
-  | .math mode value => renderMath styles key mode value none extensions.mathComponent?
+  | .math mode value => renderMath styles key mode value #[] renderers.mathComponent?
   | .emph content => do
-      let children ← renderInlines styles extensions content
+      let children ← renderInlines styles renderers content
       return ← <em key={← JsValue.ofString key}>{Js.Array.ofArray children}</em>
   | .bold content => do
-      let children ← renderInlines styles extensions content
+      let children ← renderInlines styles renderers content
       return ← <strong key={← JsValue.ofString key}>{Js.Array.ofArray children}</strong>
   | .link content destination => do
-      let children ← renderInlines styles extensions content
+      let children ← renderInlines styles renderers content
       return ← <a key={← JsValue.ofString key} href={← JsValue.ofString destination}>{Js.Array.ofArray children}</a>
   | .footnote name content => do
       let label ← Node.text (← JsValue.ofString s!"[{name}]")
-      let summary ← <summary key="structural:summary">{pure label}</summary>
-      let children ← renderInlines styles extensions content
-      return ← <details key={← JsValue.ofString key} className="vir-verso-footnote">{pure summary}{Js.Array.ofArray children}</details>
+      let label ← <sup key="structural:label">{pure label}</sup>
+      let children ← renderInlines styles renderers content
+      -- Footnotes are inline values: details/summary would make a paragraph
+      -- invalid and cause the HTML parser to relocate its children during SSR.
+      return ← <span key={← JsValue.ofString key} className="vir-verso-footnote" role="note">
+        {pure label}<span key="structural:body">{Js.Array.ofArray children}</span>
+      </span>
   | .image alt destination => do return ← <img key={← JsValue.ofString key} src={← JsValue.ofString destination} alt={← JsValue.ofString alt}/>
   | .concat content => do
       let props ← Js.Object.empty
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
-      Node.fragment props (← Js.Array.ofArray (← renderInlines styles extensions content))
+      Node.fragment props (← Js.Array.ofArray (← renderInlines styles renderers content))
   | .other extension content => do
-      match ← extensions.renderInline? key extension with
+      match ← renderers.renderInline? key extension (fun _ => renderInlines styles renderers content) with
       | some rendered => pure rendered
       | none =>
           let style := styles.inlineCode
@@ -485,29 +527,31 @@ private partial def renderInline (styles : Styles) (extensions : Extensions)
           Js.Object.set props styles.strings.keys.style style
           Js.Object.set props styles.strings.keys.key styles.strings.values.structuralExtension
           Js.Object.set props styles.strings.keys.className styles.strings.values.unsupportedExtensionClass
-          Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString extension.name.toString)
-          let marker ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[inline extension: {extension.name}]")}</code>
+          Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString (renderers.inlineName extension))
+          let marker ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[inline extension: {renderers.inlineName extension}]")}</code>
           let fragmentProps ← Js.Object.empty
           Js.Object.set fragmentProps styles.strings.keys.key (← JsValue.ofString key)
           Node.fragment fragmentProps
-            (← Js.Array.ofArray (#[marker] ++ (← renderInlines styles extensions content)))
+            (← Js.Array.ofArray (#[marker] ++ (← renderInlines styles renderers content)))
 
 where
-  renderInlines (styles : Styles) (extensions : Extensions)
-      (content : Array (_root_.Verso.Doc.Inline Genre.Manual)) : ReactM (Array (Lean.Vir.Js Node)) :=
-    content.mapIdxM fun index inline => renderInline styles extensions s!"inline:{index}" inline
+  renderInlines (styles : Styles) (renderers : Renderers g)
+      (content : Array (_root_.Verso.Doc.Inline g)) : ReactM (Array (Lean.Vir.Js Node)) :=
+    content.mapIdxM fun index inline => renderInline styles renderers s!"inline:{index}" inline
 
-private partial def renderInlines (styles : Styles) (extensions : Extensions)
-    (content : Array (_root_.Verso.Doc.Inline Genre.Manual)) : ReactM (Array (Lean.Vir.Js Node)) :=
-  content.mapIdxM fun index inline => renderInline styles extensions s!"inline:{index}" inline
+private partial def renderInlines (styles : Styles) (renderers : Renderers g)
+    (content : Array (_root_.Verso.Doc.Inline g)) : ReactM (Array (Lean.Vir.Js Node)) :=
+  content.mapIdxM fun index inline => renderInline styles renderers s!"inline:{index}" inline
 
 private def headingNode
     (styles : Styles)
     (identity : Identity)
     (level : Nat)
     (content : Array (Lean.Vir.Js Node))
-    (changed focused : Bool) : ReactM (Lean.Vir.Js Node) := do
+    (changed focused : Bool)
+    (header? : Option HeaderRenderer := none) : ReactM (Lean.Vir.Js Node) := do
   let props ← blockProps styles identity "heading" (styles.heading) changed focused
+  if let some header := header? then return ← header (min level 6) props content
   match level with
   | 1 => <h1 @props={props}>{Js.Array.ofArray content}</h1>
   | 2 => <h2 @props={props}>{Js.Array.ofArray content}</h2>
@@ -516,13 +560,13 @@ private def headingNode
   | 5 => <h5 @props={props}>{Js.Array.ofArray content}</h5>
   | _ => <h6 @props={props}>{Js.Array.ofArray content}</h6>
 
-private partial def renderBlock (styles : Styles) (extensions : Extensions) (fingerprint : Fingerprint.Value → String)
+private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
     (changedIds : Array String)
     (focus : Option String)
-    (identity : Identity) : _root_.Verso.Doc.Block Genre.Manual → ReactM (Lean.Vir.Js Node)
+    (identity : Identity) : _root_.Verso.Doc.Block g → ReactM (Lean.Vir.Js Node)
   | .para content => do
       let props ← blockProps styles identity "paragraph" (styles.paragraph) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
-      let children ← renderInlines styles extensions content
+      let children ← renderInlines styles renderers content
       return ← <p @props={props}>{Js.Array.ofArray children}</p>
   | .code source => do
       let text ← Node.text (← JsValue.ofString source)
@@ -533,21 +577,21 @@ private partial def renderBlock (styles : Styles) (extensions : Extensions) (fin
       return ← <pre @props={props}>{pure code}</pre>
   | .ul items => do
       let props ← blockProps styles identity "unordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
-      let children ← items.mapIdxM fun index item => renderListItem styles extensions fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
+      let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       return ← <ul @props={props}>{Js.Array.ofArray children}</ul>
   | .ol start items => do
       let props ← blockProps styles identity "ordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
       Js.Object.set props styles.strings.keys.start (← JsValue.ofString (toString (max start 0)))
-      let children ← items.mapIdxM fun index item => renderListItem styles extensions fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
+      let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       return ← <ol @props={props}>{Js.Array.ofArray children}</ol>
   | .dl items => do
       let children ← items.mapIdxM fun index item =>
-        renderDescItem styles extensions fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
+        renderDescItem styles renderers fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       let props ← blockProps styles identity "description-list" (styles.descriptionList) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
       return ← <dl @props={props}>{Js.Array.ofArray children.flatten}</dl>
   | .blockquote content => do
       let props ← blockProps styles identity "blockquote" (styles.blockquote) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
-      let children ← renderBlocks styles extensions fingerprint changedIds focus identity.semanticKey identity.debugPath content
+      let children ← renderBlocks styles renderers fingerprint changedIds focus identity.semanticKey identity.debugPath content
       return ← <blockquote @props={props}>{Js.Array.ofArray children}</blockquote>
   | .concat content => do
       -- Concatenations are React fragments, not DOM nodes. A source block may
@@ -556,83 +600,89 @@ private partial def renderBlock (styles : Styles) (extensions : Extensions) (fin
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString identity.reactKey)
       Node.fragment props
         (← Js.Array.ofArray
-          (← renderBlocks styles extensions fingerprint changedIds focus identity.semanticKey identity.debugPath content
+          (← renderBlocks styles renderers fingerprint changedIds focus identity.semanticKey identity.debugPath content
             (focusChildren := focus == some identity.debugPath)))
   | .other extension content => do
       let changed := changedIds.contains identity.debugPath
       let focused := focus == some identity.debugPath
       let attributes := fun kind style => blockProps styles identity kind style changed focused
       let children := fun _ : Unit =>
-        renderBlocks styles extensions fingerprint changedIds focus identity.semanticKey identity.debugPath content
-      match ← extensions.renderBlock? identity.reactKey attributes extension children with
+        renderBlocks styles renderers fingerprint changedIds focus identity.semanticKey identity.debugPath content
+      match ← renderers.renderBlock? identity.reactKey attributes extension children with
       | some rendered => pure rendered
       | none =>
           let markerStyle := styles.inlineCode
           let markerProps ← Js.Object.empty
           Js.Object.set markerProps styles.strings.keys.style markerStyle
-          let marker ← <code @props={markerProps}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[block extension: {extension.name}]")}</code>
+          let marker ← <code @props={markerProps}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[block extension: {renderers.blockName extension}]")}</code>
           let props ← attributes "unsupported-extension" (styles.unsupported)
-          Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString extension.name.toString)
+          Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString (renderers.blockName extension))
           let childNodes ← children ()
           return ← <div @props={props}>{pure marker}{Js.Array.ofArray childNodes}</div>
 
 where
-  renderListItem (styles : Styles) (extensions : Extensions) (fingerprint : Fingerprint.Value → String)
+  renderListItem (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
       (changedIds : Array String)
       (focus : Option String)
       (parentSemanticKey key path : String)
-      (item : Lean.Doc.ListItem (_root_.Verso.Doc.Block Genre.Manual)) :
+      (item : Lean.Doc.ListItem (_root_.Verso.Doc.Block g)) :
       ReactM (Lean.Vir.Js Node) := do
     let .mk content := item
     let props ← listItemProps styles key path "list-item" (styles.listItem) (focus == some path)
-    let children ← renderBlocks styles extensions fingerprint changedIds focus s!"{parentSemanticKey}/{key}" path content
+    let children ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}" path content
     return ← <li @props={props}>{Js.Array.ofArray children}</li>
 
-  renderDescItem (styles : Styles) (extensions : Extensions) (fingerprint : Fingerprint.Value → String)
+  renderDescItem (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
       (changedIds : Array String)
       (focus : Option String)
       (parentSemanticKey key path : String)
       (item : Lean.Doc.DescItem
-        (_root_.Verso.Doc.Inline Genre.Manual) (_root_.Verso.Doc.Block Genre.Manual)) :
+        (_root_.Verso.Doc.Inline g) (_root_.Verso.Doc.Block g)) :
       ReactM (Array (Lean.Vir.Js Node)) := do
     let .mk term description := item
     let termProps ← listItemProps styles s!"{key}:term" s!"{path}-term" "description-term" (styles.descriptionTerm) (focus == some path)
-    let termChildren ← renderInlines styles extensions term
+    let termChildren ← renderInlines styles renderers term
     let termNode ← <dt @props={termProps}>{Js.Array.ofArray termChildren}</dt>
     let descriptionProps ← listItemProps styles s!"{key}:description" s!"{path}-description" "description-value" (styles.descriptionValue) (focus == some path)
-    let descriptionChildren ← renderBlocks styles extensions fingerprint changedIds focus s!"{parentSemanticKey}/{key}/description" s!"{path}-description" description
+    let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}/description" s!"{path}-description" description
     let descriptionNode ← <dd @props={descriptionProps}>{Js.Array.ofArray descriptionChildren}</dd>
     pure #[termNode, descriptionNode]
 
-  renderBlocks (styles : Styles) (extensions : Extensions) (fingerprint : Fingerprint.Value → String)
+  renderBlocks (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
       (changedIds : Array String)
       (focus : Option String)
       (parentSemanticKey debugParent : String)
-      (content : Array (_root_.Verso.Doc.Block Genre.Manual))
+      (content : Array (_root_.Verso.Doc.Block g))
       (focusChildren : Bool := false) :
       ReactM (Array (Lean.Vir.Js Node)) := do
-    let identities := blockIdentities extensions parentSemanticKey debugParent content fingerprint
+    let identities := blockIdentities renderers parentSemanticKey debugParent content fingerprint
     content.mapIdxM fun index block =>
       let identity := identities[index]!
-      renderBlock styles extensions fingerprint changedIds
+      renderBlock styles renderers fingerprint changedIds
         (if focusChildren then some identity.debugPath else focus) identity block
 
-private partial def renderPart (styles : Styles) (extensions : Extensions) (fingerprint : Fingerprint.Value → String)
+private partial def renderPart (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
     (changedIds : Array String)
     (focus : Option String)
     (identity : Identity)
     (level : Nat)
-    (part : _root_.Verso.Doc.Part Genre.Manual) : ReactM (Lean.Vir.Js Node) := do
+    (part : _root_.Verso.Doc.Part g)
+    (header? : Option HeaderRenderer := none) : ReactM (Lean.Vir.Js Node) := do
+  if let some metadata := part.metadata then
+    let renderDefault := fun header? =>
+      renderPart styles renderers fingerprint changedIds focus identity level part.withoutMetadata header?
+    if let some rendered ← renderers.renderPart? identity.reactKey metadata part.withoutMetadata renderDefault then
+      return rendered
   let headingIdentity := headingIdentity identity
   let heading ← headingNode styles headingIdentity level
-    (← renderInlines styles extensions part.title)
-    (changedIds.contains headingIdentity.debugPath) (focus == some headingIdentity.debugPath)
-  let identities := blockIdentities extensions identity.semanticKey identity.debugPath part.content fingerprint
+    (← renderInlines styles renderers part.title)
+    (changedIds.contains headingIdentity.debugPath) (focus == some headingIdentity.debugPath) header?
+  let identities := blockIdentities renderers identity.semanticKey identity.debugPath part.content fingerprint
   let content ← part.content.mapIdxM fun index block =>
-    renderBlock styles extensions fingerprint changedIds focus identities[index]! block
-  let partIdentities := partIdentities identity.semanticKey identity.debugPath part.subParts fingerprint
+    renderBlock styles renderers fingerprint changedIds focus identities[index]! block
+  let partIdentities := partIdentities renderers identity.semanticKey identity.debugPath part.subParts fingerprint
   let subParts ← part.subParts.mapIdxM fun index child =>
-    renderPart styles extensions fingerprint changedIds focus partIdentities[index]! (level + 1) child
+    renderPart styles renderers fingerprint changedIds focus partIdentities[index]! (level + 1) child
   let style := styles.part
   let props ← Js.Object.empty
   Js.Object.set props styles.strings.keys.style style
@@ -645,27 +695,24 @@ private partial def renderPart (styles : Styles) (extensions : Extensions) (fing
   return ← <section @props={props}>{pure heading}{Js.Array.ofArray content}{Js.Array.ofArray subParts}</section>
 
 /-- Options computed by the stateful component before constructing the Verso VDOM. -/
-structure Options where
+structure Options (g : Doc.Genre) where
   changedIds : Array String := #[]
   focus : Option String := none
-  attributes : Option (Js Props) := none
-  /-- State prepared for this document. Omit for stateless exact-content keys. -/
-  identities? : Option Fingerprint.State := none
+  /-- Later attributes override style/class defaults, never mutate their values.
+  Cast's diagnostic data attributes are reserved and written last. -/
+  attributes : Array Attribute := #[]
+  /-- Override the adapter identity policy, e.g. with a prepared state key. -/
+  fingerprint? : Option (Fingerprint.Value g → Option String) := none
 
-/-- Construct the native React subtree for a Verso Manual document. -/
-def render (styles : Styles) (input : Doc.Part Genre.Manual) (options : Options := {})
-    (extensions : Extensions := {}) : ReactM (Lean.Vir.Js Node) := do
-  let fingerprint := options.identities?.map (fun state => state.key) |>.getD Fingerprint.canonicalKey
-  let rootPart ← renderPart styles extensions fingerprint options.changedIds options.focus rootIdentity 1 input
-  let props ← match options.attributes with
-    | some attributes => pure attributes
-    | none => do
-      let style := styles.document
-      let props ← Js.Object.empty
-      Js.Object.set props styles.strings.keys.style style
-      pure props
-  Js.Object.set props styles.strings.keys.id styles.strings.values.documentId
+/-- Construct a native React subtree for any Verso genre. No JSON or equality instances are required. -/
+def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})
+    (renderers : Renderers g := {}) : ReactM (Lean.Vir.Js Node) := do
+  let fingerprint := options.fingerprint?.getD renderers.fingerprint
+  let rootPart ← renderPart styles renderers fingerprint options.changedIds options.focus rootIdentity 1 input
+  let props ← Js.Object.empty
+  Js.Object.set props styles.strings.keys.style styles.document
   Js.Object.set props styles.strings.keys.className styles.strings.values.documentClass
+  applyAttributes props options.attributes
   Js.Object.set props styles.strings.keys.dataVersoChangedBlockCount (← JsValue.ofString (toString options.changedIds.size))
   Js.Object.set props styles.strings.keys.dataVersoFocusBlock (← JsValue.ofString (options.focus.getD ""))
   return ← <article @props={props}>{pure rootPart}</article>

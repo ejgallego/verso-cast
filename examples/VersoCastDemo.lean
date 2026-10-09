@@ -3,6 +3,7 @@ Author: Emilio J. Gallego Arias -/
 module
 
 public import VersoCast
+public import VersoCast.Manual
 public import Vir.Infoview.Widget
 public meta import Vir.Infoview.Widget
 meta import Vir.Attributes
@@ -38,6 +39,7 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) := do
     let change ← Js.Function.ofLeanVoid fun (_ : Js SyntheticEvent) =>
       Js.Function.callVoid setter (SetStateAction.ofUpdater toggle)
     let rendered ← VersoCast.Renderer.render styles (document (← JsValue.toBool extra))
+      (renderers := VersoCast.Manual.renderers)
     return ← <div data-testid="cast-demo">
       <label><input type="checkbox" checked={extra} onChange={change}/> Show an extra block</label>
       {pure rendered}

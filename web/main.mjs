@@ -1,16 +1,8 @@
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createVirRuntime } from "lean-vir";
-import { createBrowserHostBindings } from "lean-vir/host-bindings";
-import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+import { openReactRuntime } from "./runtime.mjs";
 
-const runtime = await createVirRuntime({
-  wasmUrl: new URL("runtime.wasm", import.meta.url).href,
-  irPackageSet: new URL("document.irpkg-set.json", import.meta.url).href,
-  defaultHostBindings: () => createBrowserHostBindings({
-    reactHostBindings: createBrowserReactHostBindings,
-  }),
-});
+const runtime = await openReactRuntime();
 const View = runtime.call("VersoCastDemo.View");
 const root = createRoot(document.getElementById("app"));
 let disposed = false;

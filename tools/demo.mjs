@@ -8,9 +8,9 @@ import { build } from "esbuild";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const lake = args => execFileSync("lake", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 
-export async function stageDemo() {
-  const output = resolve(root, "_out/demo");
-  const descriptor = JSON.parse(lake(["--json", "query", "+VersoCastDemo:vir"]));
+// One asset-staging path for the small widget and the live comparison.
+export async function stageProgram(target, output) {
+  const descriptor = JSON.parse(lake(["--json", "query", target]));
   const packageSet = JSON.parse(await readFile(descriptor, "utf8"));
   await mkdir(output, { recursive: true });
   await copyFile(descriptor, resolve(output, "document.irpkg-set.json"));
@@ -22,6 +22,11 @@ export async function stageDemo() {
   }
   lake(["exe", "cast-assets"]);
   await copyFile(resolve(root, ".vir/runtime.wasm"), resolve(output, "runtime.wasm"));
+  return output;
+}
+
+export async function stageDemo() {
+  const output = await stageProgram("+VersoCastDemo:vir", resolve(root, "_out/demo"));
   await copyFile(resolve(root, "web/index.html"), resolve(output, "index.html"));
   await build({
     absWorkingDir: root, entryPoints: ["web/main.mjs"],
@@ -31,14 +36,16 @@ export async function stageDemo() {
 }
 
 export async function serveDemo(directory) {
-  const types = { js: "text/javascript", json: "application/json", wasm: "application/wasm", html: "text/html" };
+  const types = { js: "text/javascript", json: "application/json", wasm: "application/wasm", html: "text/html",
+    svg: "image/svg+xml", png: "image/png" };
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
       const path = resolve(directory, pathname === "/" ? "index.html" : "." + pathname);
       if (!path.startsWith(directory + sep)) throw Error("outside demo output");
       const bytes = await readFile(path);
-      response.writeHead(200, { "Content-Type": types[path.split(".").at(-1)] ?? "application/octet-stream" });
+      response.writeHead(200, { "Content-Type": types[path.split(".").at(-1)] ?? "application/octet-stream",
+        "Cache-Control": "no-store" });
       response.end(bytes);
     } catch {
       response.writeHead(404); response.end("Not found");

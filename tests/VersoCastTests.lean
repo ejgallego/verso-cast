@@ -7,8 +7,12 @@ Author: Emilio J. Gallego Arias
 module
 
 public import VersoCast
+public import VersoCast.Manual
 public import VersoCastTests.Fingerprint
+public import VersoCastTests.Offline
 meta import VersoCast.Renderer
+meta import VersoCast.Manual
+meta import VersoManual.Basic
 meta import Vir.Attributes
 
 public section
@@ -28,13 +32,13 @@ private def inserted := document (#["A", "X", "B", "C"].map paragraph)
 private def moved := document (#["C", "A", "B"].map paragraph)
 
 #guard Renderer.changedBlockIds before before |>.isEmpty
-#guard Renderer.changedBlockIds before inserted == #["part-root-block-1"]
-#guard Renderer.changedBlockIdsAndCount (some before) inserted == (#["part-root-block-1"], 5)
-#guard Renderer.changedBlockIds before moved |>.isEmpty
+#guard Renderer.changedBlockIds before inserted Manual.renderers == #["part-root-block-1"]
+#guard Renderer.changedBlockIdsAndCount (some before) inserted Manual.renderers == (#["part-root-block-1"], 5)
+#guard Renderer.changedBlockIds before moved Manual.renderers |>.isEmpty
 
 private def extension (name : Lean.Name) : Genre.Manual.Block := { name, data := .null }
 
-private def applicationExtensions : Renderer.Extensions := {
+private def applicationExtensions : Renderer.Renderers Genre.Manual := { Manual.renderers with
   blockIdentity? := fun ext => if ext.name == `Test.notice then some "notice" else none
   renderBlock? := fun key attributes ext children => do
     if ext.name == `Test.hidden then

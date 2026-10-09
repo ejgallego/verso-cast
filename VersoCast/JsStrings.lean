@@ -20,7 +20,6 @@ structure Keys where
   className : Js String
   style : Js String
   title : Js String
-  id : Js String
   source : Js String
   start : Js String
   dataLanguage : Js String
@@ -54,7 +53,6 @@ structure Values where
   unsupportedExtensionClass : Js String
   structuralExtension : Js String
   partClass : Js String
-  documentId : Js String
   documentClass : Js String
 
 structure Fixed where
@@ -67,7 +65,6 @@ private def createKeys : RuntimeM Keys := do
     className := ← JsValue.ofString "className"
     style := ← JsValue.ofString "style"
     title := ← JsValue.ofString "title"
-    id := ← JsValue.ofString "id"
     source := ← JsValue.ofString "source"
     start := ← JsValue.ofString "start"
     dataLanguage := ← JsValue.ofString "data-language"
@@ -102,7 +99,6 @@ private def createValues : RuntimeM Values := do
     unsupportedExtensionClass := ← JsValue.ofString "vir-verso-extension-unsupported"
     structuralExtension := ← JsValue.ofString "structural:extension"
     partClass := ← JsValue.ofString "vir-verso-part"
-    documentId := ← JsValue.ofString "vir-verso-document"
     documentClass := ← JsValue.ofString "vir-verso-document"
   }
 
