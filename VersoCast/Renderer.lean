@@ -386,8 +386,13 @@ private def snapshots (renderers : Renderers g) (document : Doc.Part g) : Array 
 
 /--
 Renderer paths changed relative to the optional previous document, together
-with the current renderer-node count. The current snapshot tree is collected
-once so change highlighting and diagnostics share the same traversal.
+with the current comparison-snapshot count, not a DOM/visible-node count.
+Headings and ordinary blocks are snapshots; lists and quotes are compared as
+whole blocks. Concatenations have no snapshot of their own. Extension blocks
+and their stored children are visited without invoking rendering callbacks,
+including hidden content. Only current-document paths are returned.
+The current snapshot tree is collected once for both results. Comparisons use
+the stateless `renderers.fingerprint` policy, not a current-only prepared state.
 -/
 def changedBlockIdsAndCount [BEq g.Inline] [BEq g.Block]
     (previous : Option (Doc.Part g))
@@ -407,10 +412,11 @@ def changedBlockIdsAndCount [BEq g.Inline] [BEq g.Block]
           | none => some snapshot.debugPath
   (changedIds, currentSnapshots.size)
 
-/-- Structural renderer paths used to highlight a newly mounted document. -/
-def renderBlockIds [BEq g.Inline] [BEq g.Block] (document : Doc.Part g)
+/-- Initial comparison paths, including stored extension children irrespective
+of rendering visibility. No equality/hash/JSON instances are required. -/
+def renderBlockIds (document : Doc.Part g)
     (renderers : Renderers g := {}) : Array String :=
-  (changedBlockIdsAndCount none document renderers).1
+  (snapshots renderers document).map (·.debugPath)
 
 /-- Renderer paths whose semantic nodes are new or changed in `current`. -/
 def changedBlockIds [BEq g.Inline] [BEq g.Block] (previous current : Doc.Part g)

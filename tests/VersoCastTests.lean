@@ -13,6 +13,7 @@ public import VersoCastTests.Offline
 public import VersoCastTests.Retention
 public import VersoCastTests.Math
 public import VersoCastTests.Navigation
+public import VersoCastTests.Changes
 meta import VersoCast.Renderer
 meta import VersoCast.Manual
 meta import VersoManual.Basic
@@ -86,5 +87,8 @@ def render (scenario : Nat) : ReactM (Js Node) := do
     | 5 => { rich with content := #[paragraph "Inserted before retained parents"] ++ rich.content }
     | _ => rich)
     { focus := if scenario == 4 then some "part-root-block-0" else none } applicationExtensions
+
+@[vir_export] def renderChanges (scenario : Nat) : ReactM (Js Node) :=
+  Changes.render scenario
 
 end VersoCastTests

@@ -90,6 +90,20 @@ not part metadata, presentation changes or extension visibility. Preparation
 visits all stored blocks, including hidden content; it does not call render
 callbacks. Neither identity helper is a promise of linear whole-document cost.
 
+Change comparison is deliberately coarse for lists and blockquotes: editing a
+term, list start or nested paragraph marks the whole container. Concatenations
+have no comparison entry; extensions contribute both their own entry and stored
+children, even when a rendering callback hides them. Removed nodes have no
+current path to return. A fingerprint policy that changes an ancestor's identity
+also changes its descendants' identity context.
+`changedBlockIdsAndCount` returns the current **comparison-snapshot count**,
+not visible DOM nodes or changed-node count. The root's
+`data-verso-changed-block-count` is the number of supplied changed paths, also
+not a visibility-aware count. `renderBlockIds` computes initial comparison paths
+without equality/hash/JSON instances. Finer-grained client highlighting can
+supply nested paths directly through `Options.changedIds`; the default helper
+does not introduce another analyzed document or visibility pass.
+
 Extra root/math attributes are immutable `Array Renderer.Attribute` values.
 `Attribute.of nativeKey nativeValue` only widens the native value's phantom type;
 it performs no conversion or host call. Cache the array with styles/components
@@ -107,6 +121,8 @@ cost claims, not measured latency results.
 
 - Lean tests cover forced hash collisions, retirement/reordering, structural
   equality, extension identities, change detection and nested document forms.
+  Change-policy tests cover coarse lists/quotes, extension children, fragments,
+  deletions, counts and initial paths for a genre without equality instances.
 - `tests/downstream` checks a separate consumer of the renderer's public Lean
   API (`lake build`) and native execution of its pure identity helpers
   (`lake exe consumer`). These are distinct gates.
@@ -154,6 +170,7 @@ inline footnotes instead of a block `details` element inside a paragraph.
 | Identity collisions, duplicate contents, retirement | Pure typed-state tests and inherited key assertions |
 | State through document edits | `test:identity`: live insertion, reorder, body edit, removal/reinsertion, duplicate semantic IDs; ordinary DOM retention and disposal |
 | Focus/change diagnostics | `test:navigation`: SSR/Chromium exact block/heading/list paths, fragment propagation, description halves/shared item, hidden/missing paths, marker clearing, independent changes and retained DOM. Editor selection/follow-cursor acceptance remains with VBP |
+| Computed change paths/counts | Pure policy tests plus `test:renderer` consuming real diff results: coarse list/quote edits, extension children, hidden paths and fragment markers. Counts describe comparison inputs, not visible DOM |
 | Math typesetting | `test:math`: shared KaTeX leaf through the Lean document path in SSR/Chromium; source/mode updates, malformed recovery, escaping, macro isolation, retained DOM and disposal. Offline output is no longer empty |
 | Blueprint informal blocks, external markup, math preludes | VBP-owned adapter and consumer parity gates; not inferred from Manual tests |
 | Transport, codecs, FIR backend, editor shell | Separate owner-held integration gates; no private decoder or copied provider adopted here |

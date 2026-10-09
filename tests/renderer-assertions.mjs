@@ -50,3 +50,32 @@ export function checkRenderer(render) {
     extensionCallbacks: true, hiddenContentOmitted: true, stableReactKeys: true,
     concatenationFocus: true, siblingLocalDescendantKeys: true };
 }
+
+// The diff helper describes comparison snapshots, not visible DOM nodes.
+// Keep its coarse-container policy explicit while checking real markup.
+export function checkChangeHighlighting(render) {
+  function markers(node, found = []) {
+    if (!isValidElement(node)) return found;
+    if (node.props["data-verso-change"] === "changed")
+      found.push([node.type, node.props["data-verso-block"]]);
+    Children.forEach(node.props.children, child => markers(child, found));
+    return found;
+  }
+  const block = "part-root-block-0";
+  for (const [kind, tag] of ["ul", "ol", "dl", "blockquote"].entries()) {
+    assert.deepEqual(markers(render(2 * kind)), [], "unchanged document has no change markers");
+    assert.deepEqual(markers(render(2 * kind + 1)), [[tag, block]],
+      "nested edit highlights the whole list/quote, not individual descendants");
+  }
+  assert.deepEqual(markers(render(9)), [["div", block], ["p", `${block}-block-0`]],
+    "extensions compare their parent and stored children");
+  const hidden = render(11);
+  assert.deepEqual(markers(hidden), [], "hidden content creates no visible marker");
+  assert.equal(hidden.props["data-verso-changed-block-count"], "2",
+    "diagnostic count is supplied changed paths, including hidden content");
+  assert.deepEqual(markers(render(13)), [["p", `${block}-block-1`]],
+    "fragments have no phantom change marker");
+  assert.ok(markers(render(14)).length > 0, "initial paths work for a genre without equality instances");
+  return { coarseContainerChanges: true, extensionChildChanges: true,
+    hiddenChangePaths: true, initialPathsWithoutEquality: true };
+}
