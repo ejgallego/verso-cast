@@ -103,4 +103,42 @@ children are not visited; this test uses no hashing/JSON identity capability. -/
   let _ ← Renderer.render styles document (renderers := handlers)
   visits.get
 
+/-- Metadata dispatch must precede title/body work. Test-only events record
+one traversal, fallback/default equivalence and skipped section contents. -/
+@[vir_export] def partContract (mode : Nat) : ReactM (Js Node) := do
+  let styles ← Renderer.Styles.create
+  let events ← RuntimeRef.new (#[] : Array String)
+  let part := fun (label : String) (metadata : Option String) =>
+    (Verso.Doc.Part.mk #[.other .highlight #[.text s!"{label} title"]] s!"{label} title"
+      metadata #[.other .notice #[Fixture.paragraph s!"{label} body"]] #[] : Verso.Doc.Part Fixture.genre)
+  let document := { part "root" (some "root") with
+    subParts := #[part "child" (some "child"), part "plain" none] }
+  let handlers : Renderer.Renderers Fixture.genre := {
+    renderInline? := fun _ _ _ => do
+      events.modify (·.push "inline")
+      return none
+    renderBlock? := fun _ _ _ _ => do
+      events.modify (·.push "block")
+      return none
+    renderPart? := fun key (label : String) part renderDefault => do
+      events.modify (·.push (if part.metadata.isNone then s!"part:{label}" else "BAD:metadata"))
+      if mode == 3 || (mode == 4 && label == "child") then
+        let props ← js%{ "key" := (← JsValue.ofString key) }
+        return some (← Node.fragment props (← Js.Array.empty))
+      if mode == 0 then return none
+      if mode == 2 then
+        let header : Renderer.HeaderRenderer := fun level props title => do
+          events.modify (·.push s!"header:{level}")
+          Js.Object.set props (← JsValue.ofString "data-contract-header") (← JsValue.ofString label)
+          Node.createElement (← ElementType.tag (← JsValue.ofString s!"h{level}"))
+            props (← Js.Array.ofArray title)
+        return some (← renderDefault (some header))
+      return some (← renderDefault none) }
+  let rendered ← Renderer.render styles document {
+    focus := some "part-root-heading"
+    changedIds := #["part-root-heading"] } handlers
+  let events ← events.get
+  return ← <div data-contract-events={← JsValue.ofString (String.intercalate "|" events.toList)}>
+    {pure rendered}</div>
+
 end VersoCastTests.Offline

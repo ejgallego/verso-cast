@@ -4,7 +4,7 @@ import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
-import { createElement, Children } from "react";
+import { createElement, Children, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { build } from "esbuild";
 import { openTestRuntime, query, root } from "./runtime.mjs";
@@ -40,6 +40,41 @@ try {
     assert.equal(runtime.call("VersoCastTests.Offline.extensionWork", count), 2n * count,
       "one dispatch per visible extension; hidden descendants skipped");
   }
+  const ordinaryEvents = ["part:root", "inline", "block", "part:child", "inline", "block", "inline", "block"];
+  const eventsByMode = [ordinaryEvents, ordinaryEvents,
+    ["part:root", "inline", "header:1", "block", "part:child", "inline", "header:2", "block", "inline", "block"],
+    ["part:root"], ["part:root", "inline", "block", "part:child", "inline", "block"]];
+  function headings(node, found = []) {
+    if (!isValidElement(node)) return found;
+    if (typeof node.type === "string" && /^h[1-6]$/.test(node.type)) found.push(node);
+    Children.forEach(node.props.children, child => headings(child, found));
+    return found;
+  }
+  let fallbackHtml;
+  for (const [mode, expected] of eventsByMode.entries()) {
+    const node = runtime.call("VersoCastTests.Offline.partContract", BigInt(mode));
+    assert.deepEqual(node.props["data-contract-events"].split("|"), expected,
+      "metadata is stripped only locally; one dispatch precedes each section's content");
+    const html = renderToStaticMarkup(node);
+    if (mode === 0) fallbackHtml = html;
+    if (mode === 1) assert.equal(html, fallbackHtml, "delegating to default is equivalent to returning none");
+    const headers = headings(node);
+    assert.equal(headers.length, mode === 3 ? 0 : mode === 4 ? 2 : 3);
+    if (mode === 2) {
+      assert.deepEqual(headers.map(header => [header.type, header.props["data-contract-header"]]),
+        [["h1", "root"], ["h2", "child"], ["h2", undefined]],
+        "a custom parent header must not leak to a metadata-free child");
+      assert.equal(headers[0].props["data-verso-focus"], "cursor");
+      assert.equal(headers[0].props["data-verso-change"], "changed");
+    }
+    if (mode === 3) assert.doesNotMatch(html, /root title|root body|child title|plain title/);
+    if (mode === 4) {
+      assert.doesNotMatch(html, /child title|child body/);
+      assert.match(html, /plain title/);
+      assert.match(html, /plain body/);
+    }
+  }
+  console.log("Part extension contract: lazy dispatch, local metadata stripping, fallback/default, custom headers and hidden sections PASS");
   assert.ok(!cast.includes('id="vir-verso-document"'), "no shared fixed document id");
   assert.ok(cast.includes('data-cast-initial="ready"'), "React SSR evaluates the extension component's initial hook state");
   assert.ok(cast.includes('data-cast-inline-visits="1"'), "hidden inline children are not eagerly rendered");

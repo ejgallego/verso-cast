@@ -166,7 +166,7 @@ inline footnotes instead of a block `details` element inside a paragraph.
 | Area | Current evidence / boundary |
 | --- | --- |
 | Ordinary document forms, source math, escaping | Inherited Manual SSR assertions plus the shared Verso/SSR/live fixture |
-| Extension replacement, fallback, hidden children | Inherited callbacks plus counted generic-genre dispatch and lazy-child checks |
+| Extension replacement, fallback, hidden children | Inherited callbacks, counted generic-genre dispatch and lazy children; `test:offline` also checks part-hook order, local metadata stripping, fallback/default equivalence, header isolation and hidden sections |
 | Identity collisions, duplicate contents, retirement | Pure typed-state tests and inherited key assertions |
 | State through document edits | `test:identity`: live insertion, reorder, body edit, removal/reinsertion, duplicate semantic IDs; ordinary DOM retention and disposal |
 | Focus/change diagnostics | `test:navigation`: SSR/Chromium exact block/heading/list paths, fragment propagation, description halves/shared item, hidden/missing paths, marker clearing, independent changes and retained DOM. Editor selection/follow-cursor acceptance remains with VBP |
@@ -218,6 +218,12 @@ repair is recorded, not required to remain as an upstream bug. The live pane
 checks state/DOM retention through 20 redraws, no React nesting/runtime errors,
 and disposal. Additional checks cover frozen style values, attribute precedence,
 and exact callback counts for wide extension trees with hidden descendants.
+The metadata contract probe additionally checks five paths: decline to fallback,
+delegate once to the default, supply a custom heading, hide the root, and hide
+one child. Exact event order ensures title/body work stays lazy and descendant
+metadata is preserved; custom headings retain focus/change attributes without
+leaking into metadata-free children. These counters exist only in test fixtures,
+not in the core traversal.
 CSS, wrappers and fallback wording may differ. Math remains untypeset in this
 fixture. This is not a full Manual traversal/HTML-generation fidelity claim.
 See [Fixture.lean](tests/VersoCastTests/Fixture.lean) for the shared document and
