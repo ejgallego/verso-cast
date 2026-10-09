@@ -53,7 +53,8 @@ function. Roles/directives already elaborate into Verso nodes; Cast does not
 register or elaborate them again. Resolved references, numbering and other
 traversal-dependent data remain client/genre responsibilities.
 Math defaults to source-preserving output; a caller can supply a stable
-`mathComponent?` leaf. No KaTeX bundle is included at this checkpoint.
+`mathComponent?` leaf. The optional [KaTeX leaf](web/katex.mjs) is shared by live
+React and offline SSR; the core Lean renderer does not depend on KaTeX.
 
 Basic rendering requires no JSON, equality or hash instances and uses positional
 keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
@@ -109,6 +110,7 @@ npm run test:renderer
 npm run test:widget
 npm run test:identity
 npm run test:offline
+npm run test:math
 ```
 
 Run the Lean build before `npm ci`: the local npm dependency points to Lake's
@@ -141,7 +143,7 @@ inline footnotes instead of a block `details` element inside a paragraph.
 | Identity collisions, duplicate contents, retirement | Pure typed-state tests and inherited key assertions |
 | State through document edits | `test:identity`: live insertion, reorder, body edit, removal/reinsertion, duplicate semantic IDs; ordinary DOM retention and disposal |
 | Focus/change diagnostics | Inherited path/key and fragment-focus checks; editor selection/follow-cursor acceptance remains with VBP |
-| Math typesetting | Stable component-injection API retained; KaTeX leaf not yet ported/qualified. The old effect-only leaf had no offline typeset output |
+| Math typesetting | `test:math`: shared KaTeX leaf through the Lean document path in SSR/Chromium; source/mode updates, malformed recovery, escaping, macro isolation, retained DOM and disposal. Offline output is no longer empty |
 | Blueprint informal blocks, external markup, math preludes | VBP-owned adapter and consumer parity gates; not inferred from Manual tests |
 | Transport, codecs, FIR backend, editor shell | Separate owner-held integration gates; no private decoder or copied provider adopted here |
 
@@ -193,6 +195,38 @@ fixture. This is not a full Manual traversal/HTML-generation fidelity claim.
 See [Fixture.lean](tests/VersoCastTests/Fixture.lean) for the shared document and
 Verso HTML instance, and [Offline.lean](tests/VersoCastTests/Offline.lean) for the
 corresponding Cast callbacks.
+
+### Optional math leaf
+
+```js
+import katex from "katex";
+import "katex/dist/katex.css";
+import { createMathComponent } from "./web/katex.mjs";
+
+const MathFormula = createMathComponent(katex); // once, outside render
+```
+
+Pass this native React function as `Renderer.Renderers.mathComponent?` on the
+Lean side. It receives `source` and `data-verso-math-mode` from Cast and preserves
+the caller's other attributes. Both browser rendering and React SSR use
+`renderToString`, including accessible MathML; no effect is needed to populate
+the formula. The memoized computation depends only on source and display mode.
+React may recompute it, so correctness does not rely on memoization. Input is
+untrusted (`trust: false`), parse failures remain visible, and each computation
+gets a fresh macro table. Only KaTeX-produced HTML enters the inner-HTML boundary.
+Clients own source preparation (including genre-specific preludes), KaTeX
+version and CSS/font delivery. No Blueprint-specific attribute is interpreted.
+
+The tests pin KaTeX in npm dev dependencies and bundle CSS/fonts for a small
+live/offline comparison. This does not add an npm requirement to `lake build`:
+
+```sh
+npm run test:math -- --serve
+```
+
+Open the printed URL to edit a formula and toggle display mode. The offline pane
+is the initial formula rendered through the same Lean document path and native
+component; it is intentionally static. Ctrl-C stops the server.
 
 The React renderer executes through VIR, including for Node SSR; it is not a
 native Lean HTML generator. Native C

@@ -37,7 +37,8 @@ export async function stageDemo() {
 
 export async function serveDemo(directory) {
   const types = { js: "text/javascript", json: "application/json", wasm: "application/wasm", html: "text/html",
-    svg: "image/svg+xml", png: "image/png" };
+    svg: "image/svg+xml", png: "image/png", css: "text/css",
+    woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf" };
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
