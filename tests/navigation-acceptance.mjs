@@ -33,6 +33,7 @@ const cases = [
   [b(7), [["DIV", b(7)]]],
   [`${b(7)}-block-0`, [["P", `${b(7)}-block-0`]]],
   ["part-root-part-0-heading", [["H2", "part-root-part-0-heading"]]],
+  ...[9, 10, 11].map(index => [b(index), [["OL", b(index)]]]),
   [`${b(1)}-block-0`, []], // Empty fragment.
   [`${b(1)}-block-3`, []], // Hidden extension inside a focused fragment.
   [b(8), []],
@@ -46,6 +47,7 @@ function collect(node, nodes = []) {
   if (!isValidElement(node)) return nodes;
   const path = node.props["data-verso-block"] ?? node.props["data-verso-list-item"];
   if (path) nodes.push({ tag: node.type.toUpperCase(), path, key: node.key,
+    start: node.props.start,
     focused: node.props["data-verso-focus"] === "cursor",
     changed: node.props["data-verso-change"] === "changed", classes: node.props.className });
   Children.forEach(node.props.children, child => collect(child, nodes));
@@ -55,6 +57,9 @@ const { runtime } = await openTestRuntime("+VersoCastTests.Navigation:vir");
 try {
   const render = path => runtime.call("VersoCastTests.Navigation.render", path);
   const initial = collect(render(""));
+  assert.deepEqual(initial.filter(node => node.tag === "OL").map(node => node.start),
+    ["2", "7", "-2", "0", "4"], "SSR preserves signed ordered-list starts");
+  assert.match(renderToStaticMarkup(render("")), /start="-2"/);
   assert.deepEqual(initial.filter(node => /^H\d$/.test(node.tag)).map(node => node.tag),
     ["H1", "H2", "H3", "H4", "H5", "H6", "H6", "H6"], "custom heading levels clamp at h6");
   assert.match(renderToStaticMarkup(render("")), /id="nav-leaf"/);
@@ -83,6 +88,10 @@ try {
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(url);
   await page.locator("#app article").waitFor();
+  assert.deepEqual(await page.locator("#app ol").evaluateAll(nodes =>
+    nodes.map(node => [node.getAttribute("start"), node.start])),
+    [["2", 2], ["7", 7], ["-2", -2], ["0", 0], ["4", 4]],
+    "Chromium receives the authored start, including negative and zero values");
   await page.evaluate(() => { window.retainedNavigation = [...document.querySelectorAll(
     "#app [data-verso-block], #app [data-verso-list-item]")]; });
   for (const [path, expected] of cases) {

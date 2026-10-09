@@ -70,14 +70,29 @@ import `VersoCast.Manual` and extend `Manual.renderers`; this adapter preserves
 named placeholders and a stateless serialized-content key policy.
 The core `VersoCast` import does not import Manual.
 
+Semantic block labels are opaque strings; separators and Unicode are allowed.
+Internal comparison paths encode their components unambiguously. These paths
+are not the React keys or positional navigation addresses.
+
 For retained documents, keep `Fingerprint.State genre` in component state and
 advance it with `Renderer.prepareIdentities` when document content changes.
 This opt-in path requires equality/hash instances for the genre's extensions.
 Pass `{ fingerprint? := some (fun value => some (identities.key value)) }` as
-render options, using the state prepared for that document. Preparation is pure
-and resolves hash collisions with exact equality. React keys are sibling-local;
-navigation paths are separate.
+render options, using the state prepared for that document and the same
+`blockIdentity?` policy as rendering. Reprepare if either changes. Preparation
+is pure and resolves hash collisions with exact equality. React keys are
+sibling-local; navigation paths are separate.
 Cursor/control changes need not recompute content identities.
+
+List and description-list item keys are positional. Inserting or reordering
+items may reuse state at a position or remount subtrees; an identified block
+inside an item does not override its ancestor's React identity. A content
+fingerprint that changes a container's key also remounts its subtree. For stable
+state through item reordering, use a client-owned keyed list component in a
+block extension.
+
+Ordered lists preserve their signed `start` value, including negative values
+and zero.
 
 ## Focus and change highlighting
 

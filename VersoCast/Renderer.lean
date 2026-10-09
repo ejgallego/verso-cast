@@ -75,6 +75,11 @@ private structure Identity where
 private def fingerprintFriendlyId (value : String) : String :=
   s!"fp-{(hash value : UInt64)}"
 
+-- The segment is a fixed internal role; the key is opaque client data and may
+-- contain separators. This encoding is separate from React keys and navigation.
+private def semanticChild (parent segment key : String) : String :=
+  s!"{parent}/{segment}/{key.length}:{key}"
+
 private def IdentityHints.resolve
     (kind : String) (index : Nat) (debugPath : String) (hints : IdentityHints) : IdentityBase :=
   match hints.explicitId?, hints.fingerprint? with
@@ -105,7 +110,7 @@ private def allocateSiblingIdentities
     identities := identities.push {
       reactKey
       debugPath
-      semanticKey := s!"{parentSemanticKey}/{segment}/{reactKey}"
+      semanticKey := semanticChild parentSemanticKey segment reactKey
       friendlyId
       origin := base.origin
     }
@@ -188,7 +193,7 @@ private def rootIdentity : Identity := {
 private def headingIdentity (part : Identity) : Identity := {
   reactKey := "structural:heading"
   debugPath := RenderPath.heading part.debugPath
-  semanticKey := s!"{part.semanticKey}/heading"
+  semanticKey := semanticChild part.semanticKey "heading" ""
   friendlyId := s!"{part.friendlyId}/heading"
   origin := .structural
 }
@@ -460,7 +465,7 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
       return ← <ul @props={props}>{Js.Array.ofArray children}</ul>
   | .ol start items => do
       let props ← blockProps styles identity "ordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
-      Js.Object.set props styles.strings.keys.start (← JsValue.ofString (toString (max start 0)))
+      Js.Object.set props styles.strings.keys.start (← JsValue.ofString (toString start))
       let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       return ← <ol @props={props}>{Js.Array.ofArray children}</ol>
   | .dl items => do
@@ -508,7 +513,8 @@ where
       ReactM (Lean.Vir.Js Node) := do
     let .mk content := item
     let props ← listItemProps styles key path "list-item" (styles.listItem) (focus == some path)
-    let children ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}" path content
+    let children ← renderBlocks styles renderers fingerprint changedIds focus
+      (semanticChild parentSemanticKey "item" key) path content
     return ← <li @props={props}>{Js.Array.ofArray children}</li>
 
   renderDescItem (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
@@ -529,7 +535,8 @@ where
     let termNode ← <dt @props={termProps}>{Js.Array.ofArray termChildren}</dt>
     let descriptionProps ← listItemProps styles s!"{key}:description" descriptionPath "description-value" (styles.descriptionValue)
       (focus == some path || focus == some descriptionPath)
-    let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus s!"{parentSemanticKey}/{key}/description" descriptionPath description
+    let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus
+      (semanticChild parentSemanticKey "description" key) descriptionPath description
     let descriptionNode ← <dd @props={descriptionProps}>{Js.Array.ofArray descriptionChildren}</dd>
     pure #[termNode, descriptionNode]
 

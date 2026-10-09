@@ -27,7 +27,10 @@ private def document : Part Fixture.genre := .mk #[.text "Navigation"] "Navigati
     .blockquote #[Fixture.paragraph "Quoted paragraph"],
     .other .notice #[Fixture.paragraph "Notice paragraph"],
     .other .unsupported #[Fixture.paragraph "Fallback paragraph"],
-    .other .hidden #[Fixture.paragraph "HIDDEN BLOCK"]
+    .other .hidden #[Fixture.paragraph "HIDDEN BLOCK"],
+    .ol (-2) #[.mk #[Fixture.paragraph "Negative start"]],
+    .ol 0 #[.mk #[Fixture.paragraph "Zero start"]],
+    .ol 4 #[.mk #[Fixture.paragraph "Positive start"]]
   ] #[sectionChain 6]
 
 private def renderers : Renderer.Renderers Fixture.genre where

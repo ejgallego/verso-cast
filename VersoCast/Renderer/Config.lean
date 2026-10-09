@@ -42,7 +42,8 @@ structure Renderers (g : Doc.Genre) where
       g.Block → (children : Unit → ReactM (Array (Js Node))) →
       ReactM (Option (Js Node)) :=
     fun _ _ _ _ => pure none
-  /-- Optional semantic identity; sibling duplicates are disambiguated by the renderer. -/
+  /-- Optional opaque semantic identity; any string is accepted, including separators.
+  Sibling duplicates are disambiguated by the renderer. -/
   blockIdentity? : g.Block → Option String := fun _ => none
   /-- Optional content identities; basic rendering uses positional keys. -/
   fingerprint : Fingerprint.Value g → Option String := fun _ => none

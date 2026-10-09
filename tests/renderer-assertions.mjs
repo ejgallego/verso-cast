@@ -76,6 +76,11 @@ export function checkChangeHighlighting(render) {
   assert.deepEqual(markers(render(13)), [["p", `${block}-block-1`]],
     "fragments have no phantom change marker");
   assert.ok(markers(render(14)).length > 0, "initial paths work for a genre without equality instances");
+  assert.deepEqual(markers(render(15)), [], "opaque semantic labels cannot alias a nested path");
+  assert.deepEqual(markers(render(16)), [["div", block], ["div", `${block}-block-0`],
+    ["p", `${block}-block-0-block-0`]], "nested edit does not mark the path-like sibling label");
+  assert.deepEqual(markers(render(17)), [["div", "part-root-block-1"], ["p", "part-root-block-1-block-0"]],
+    "sibling edit does not mark the nested branch");
   return { coarseContainerChanges: true, extensionChildChanges: true,
-    hiddenChangePaths: true, initialPathsWithoutEquality: true };
+    hiddenChangePaths: true, initialPathsWithoutEquality: true, opaqueIdentityPaths: true };
 }

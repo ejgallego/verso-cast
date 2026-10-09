@@ -62,6 +62,44 @@ def policyChecks : Bool := Id.run do
 
 #guard policyChecks
 
+private def labeled (label : String) (children : Array (Block Genre.Manual)) : Block Genre.Manual :=
+  .other { name := `Changes.label, data := .str label } children
+
+private def labelRenderers : Renderer.Renderers Genre.Manual where
+  blockIdentity? := fun extension => match extension.data with
+    | .str label => some label
+    | _ => none
+
+private def labeledDocument (nested sibling : String) : Part Genre.Manual :=
+  .mk #[] "" none #[
+    labeled "a" #[labeled "b" #[paragraph nested]],
+    labeled "a:occurrence:0/block/explicit:b" #[paragraph sibling]
+  ] #[]
+
+/-- Opaque client labels must not alias nested comparison paths. -/
+def identityPathChecks : Bool := Id.run do
+  let before := labeledDocument "nested" "sibling"
+  if !(Renderer.changedBlockIds before before labelRenderers).isEmpty then return false
+  if Renderer.changedBlockIdsAndCount (some before) before labelRenderers != (#[], 6) then
+    return false
+  if Renderer.changedBlockIds before (labeledDocument "edited" "sibling") labelRenderers !=
+      #["part-root-block-0", "part-root-block-0-block-0", "part-root-block-0-block-0-block-0"] then
+    return false
+  if Renderer.changedBlockIds before (labeledDocument "nested" "edited") labelRenderers !=
+      #["part-root-block-1", "part-root-block-1-block-0"] then return false
+  let moved := { before with content := before.content.reverse }
+  if !(Renderer.changedBlockIds before moved labelRenderers).isEmpty then return false
+  let onlySibling := { before with content := #[before.content[1]!] }
+  if !(Renderer.changedBlockIds before onlySibling labelRenderers).isEmpty then return false
+  -- No restrictions on separator characters or Unicode in a client's label.
+  for label in #["", "/", "heading", "0:", "α/🧭:occurrence:0"] do
+    let document : Part Genre.Manual := .mk #[] "" none
+      #[labeled label #[paragraph "one"], labeled label #[paragraph "two"]] #[]
+    if !(Renderer.changedBlockIds document document labelRenderers).isEmpty then return false
+  return true
+
+#guard identityPathChecks
+
 private def renderers : Renderer.Renderers Genre.Manual where
   renderBlock? := fun key _attributes extension _children => do
     if extension.name == `Changes.hidden then
@@ -74,6 +112,14 @@ def render (scenario : Nat) : ReactM (Js Node) := do
   let styles ← Renderer.Styles.create
   if scenario == 14 then
     return ← Renderer.render styles Fixture.document { changedIds := genericInitialIds }
+  if scenario ≥ 15 then
+    let before := labeledDocument "nested" "sibling"
+    let current := match scenario with
+      | 16 => labeledDocument "edited" "sibling"
+      | 17 => labeledDocument "nested" "edited"
+      | _ => before
+    let changedIds := Renderer.changedBlockIds before current labelRenderers
+    return ← Renderer.render styles current { changedIds } labelRenderers
   let kind := scenario / 2
   let before := document kind "before"
   let current := document kind (if scenario % 2 == 0 then "before" else "after")
