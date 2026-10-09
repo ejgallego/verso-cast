@@ -16,6 +16,8 @@ result in its render callback. Styles are read-only native JavaScript objects;
 the renderer constructs fresh node attributes. It returns a React subtree, not
 a root, state store, widget, editor protocol or asset publisher.
 
+## Genre extensions
+
 `Renderer.Renderers genre` supplies optional inline/block and part-metadata
 render helpers. Pass it explicitly as `renderers := myRenderers`; no global
 registry is needed. Callbacks receive the genre's own extension values and lazy
@@ -41,6 +43,26 @@ Math defaults to source-preserving output; a caller can supply a stable
 `mathComponent?` leaf. The optional [KaTeX leaf](../js/katex.mjs) is shared by live
 React and offline SSR; the core Lean renderer does not depend on KaTeX.
 
+The [standalone showcase](../examples/VersoCastShowcase.lean) is a complete,
+checked client: it defines a genre, creates styles once, supplies all three hooks
+and renders a document with ordinary React checkbox state. Its `renderInline?`
+returns a badge, `renderBlock?` returns a callout using the supplied attributes,
+and `renderPart?` adds heading anchors by delegating to `renderDefault`.
+There is no registration step for these callbacks.
+
+| Hook outcome | Children/default callback | Result |
+| --- | --- | --- |
+| Decline | Do not call | `none`, allowing Cast's fallback |
+| Replace or decorate | Call once if needed | `some node` |
+| Hide | Do not call | `some` keyed empty fragment |
+
+Keep a stateful extension's component function stable by creating it in the
+factory, not during document traversal. Return a node for that component;
+React then owns its hooks and retained state. Live and offline rendering use
+the same callbacks. Content created only by effects is absent from offline HTML.
+
+## Identities and retained state
+
 Basic rendering requires no JSON, equality or hash instances and uses positional
 keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
 `Renderers.fingerprint` optionally supplies content identities. For Manual,
@@ -56,6 +78,8 @@ render options, using the state prepared for that document. Preparation is pure
 and resolves hash collisions with exact equality. React keys are sibling-local;
 navigation paths are separate.
 Cursor/control changes need not recompute content identities.
+
+## Focus and change highlighting
 
 `Options.focus` is a source-navigation address, not a React key or DOM ID.
 It adds a visual marker without moving keyboard focus or scrolling. Ordinary
@@ -89,6 +113,8 @@ without equality/hash/JSON instances. Finer-grained client highlighting can
 supply nested paths directly through `Options.changedIds`; the default helper
 does not introduce another analyzed document or visibility pass.
 
+## Native attributes and ownership
+
 Extra root/math attributes are immutable `Array Renderer.Attribute` values.
 `Attribute.of nativeKey nativeValue` only widens the native value's phantom type;
 it performs no conversion or host call. Cache the array with styles/components
@@ -101,6 +127,11 @@ write per field; it never enumerates an opaque native object. The ordinary
 extension dispatch adds O(1) work per visited extension, excluding its renderer,
 child rendering and any opt-in content identity policy. These are structural
 cost claims, not measured latency results.
+
+The [separate consumer](../tests/downstream/Consumer.lean) compiles all three
+extension hooks, heading customization and root attributes through
+`import VersoCast` alone, for an arbitrary genre without additional instances.
+It is an import/API check, not a second renderer or widget implementation.
 
 ## Optional math leaf
 

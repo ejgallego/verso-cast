@@ -21,7 +21,8 @@ The checked standalone consumer is separate:
 
 `.github/workflows/ci.yml` runs this sequence with no restored build caches on
 Ubuntu 24.04 and Node 24, using SHA-pinned actions. It installs Chromium's system
-dependencies with Playwright. The workflow is checked in, not a claim of a
+dependencies with Playwright and explicitly disables Lake's local artifact cache.
+The workflow is checked in, not a claim of a
 successful remote CI run; no publish credentials or release step are present.
 
 ## Qualification
@@ -31,8 +32,9 @@ successful remote CI run; no publish credentials or release step are present.
   Change-policy tests cover coarse lists/quotes, extension children, fragments,
   deletions, counts and initial paths for a genre without equality instances.
 - `tests/downstream` checks a separate consumer of the renderer's public Lean
-  API (`lake build`) and native execution of its pure identity helpers
-  (`lake exe consumer`). These are distinct gates.
+  API, including generic extension hooks, headings and attribute configuration
+  through the root import (`lake build`), and native execution of its pure identity
+  helpers (`lake exe consumer`). These are distinct gates.
 - Real React assertions are in `tests/renderer-assertions.mjs`. Their runner uses
   the pinned VIR checkout's public npm entry points and host bindings, with the
   exact published runtime acquired through VIR's Lake resource API:

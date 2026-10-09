@@ -424,9 +424,9 @@ where
       (content : Array (_root_.Verso.Doc.Inline g)) : ReactM (Array (Lean.Vir.Js Node)) :=
     content.mapIdxM fun index inline => renderInline styles renderers s!"inline:{index}" inline
 
-private partial def renderInlines (styles : Styles) (renderers : Renderers g)
+private def renderInlines (styles : Styles) (renderers : Renderers g)
     (content : Array (_root_.Verso.Doc.Inline g)) : ReactM (Array (Lean.Vir.Js Node)) :=
-  content.mapIdxM fun index inline => renderInline styles renderers s!"inline:{index}" inline
+  renderInline.renderInlines styles renderers content
 
 private def headingNode
     (styles : Styles)
