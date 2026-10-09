@@ -17,6 +17,11 @@ The checked standalone consumer is separate:
 (cd tests/downstream && lake build && lake exe consumer)
 ```
 
+`.github/workflows/ci.yml` runs this sequence with no restored build caches on
+Ubuntu 24.04 and Node 24, using SHA-pinned actions. It installs Chromium's system
+dependencies with Playwright. The workflow is checked in, not a claim of a
+successful remote CI run; no publish credentials or release step are present.
+
 ## Qualification
 
 - Lean tests cover forced hash collisions, retirement/reordering, structural
@@ -131,6 +136,13 @@ Verso HTML instance, and [Offline.lean](../tests/VersoCastTests/Offline.lean) fo
 corresponding Cast callbacks.
 
 ## Small widget boundary
+
+For the richer standalone showcase, open `examples/VersoCastShowcase.lean` and
+place the cursor inside `showcase_ready`. It defines its own genre, badge role,
+callout directive, section-header adapter and ordinary React checkbox state.
+It imports no test fixture or Blueprint code and reuses the same widget/assets
+setup as the minimal example. Math typesetting is demonstrated separately by
+`npm run test:math -- --serve`; it is not injected into this widget.
 
 `examples/VersoCastDemo.lean` uses VIR's native-props `vir_proof_widget` mechanism:
 one Manual document, one retained checkbox, and no custom server/RPC/shell. The

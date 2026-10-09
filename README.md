@@ -96,4 +96,6 @@ qualification is separate. The full renderer's native Lean C precompilation is
 not qualified; offline HTML currently uses React SSR through VIR.
 
 [Extraction provenance](ORIGIN.md) records the source and deliberate changes.
-Publication still needs a fresh-checkout CI gate and consumer review.
+The CI workflow builds from a fresh checkout without restored build caches,
+checks a separate consumer, and runs the SSR/Chromium suite. Remote CI and
+Blueprint consumer review must pass before publication; no release is automated.

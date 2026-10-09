@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-checkout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: leanprover/lean-action@f061402b660e0c34644504b324e830f2991d4865 # v1
+        with:
+          auto-config: false
+          build: true
+          build-args: VersoCast VersoCastTests VersoCastExamples cast-assets cast-standard-html
+          test: true
+          use-github-cache: false
+          use-mathlib-cache: false
+      - name: Check public consumer
+        working-directory: tests/downstream
+        run: |
+          lake build
+          lake exe consumer
+      - name: Install locked browser test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Check real React SSR and Chromium
+        run: npm test

@@ -31,5 +31,5 @@ lean_exe «cast-standard-html» where
 -- Optional live example; the renderer library does not import Infoview.
 lean_lib VersoCastExamples where
   srcDir := "examples"
-  roots := #[`VersoCastDemo]
+  roots := #[`VersoCastDemo, `VersoCastShowcase]
   requiresModuleSystem := true
