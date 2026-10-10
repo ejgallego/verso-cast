@@ -8,6 +8,7 @@ import { chromium } from "playwright";
 import { build } from "esbuild";
 import { openTestRuntime, query, root } from "./runtime.mjs";
 import { stageProgram, serveDemo } from "../tools/demo.mjs";
+import { checkSlidesContract } from "./slides/contract.mjs";
 
 const cases = {
   blog: { cwd: root, target: "+VersoCastTests.Blog:vir", standard: "cast-blog-html",
@@ -32,6 +33,10 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
       assert.match(page, /class="page-badge"/);
       assert.match(page, /Blog.component:Missing/);
       assert.match(page, /Fallback children/);
+    }
+    if (name === "slides") {
+      const { runtime: contract } = await openTestRuntime("+CastSlides.Contract:vir", { cwd: spec.cwd });
+      try { checkSlidesContract(contract); } finally { contract.dispose(); }
     }
     const directory = resolve(root, "_out/genres", name);
     await stageProgram(spec.target, directory, { cwd: spec.cwd });
@@ -118,6 +123,10 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
       assert.deepEqual(observations.live.nested, ["Nested decoration."]);
       assert.equal(await page.locator('#live [data-slide-vertical="true"]').count(), 1);
       assert.equal(await page.locator('#live [data-background-color="#e9f5ef"]').count(), 1);
+      assert.equal(await page.locator("#live .slide-badge").textContent(), "class role");
+      assert.equal(await page.locator("#live .r-hstack").evaluate(node => getComputedStyle(node).display), "flex",
+        "authored layout classes are not overridden by a default inline grid");
+      assert.ok(observations.live.code.includes('const message = "<escaped>";'));
       await page.evaluate(() => { window.retainedHeading = document.querySelector("#live h2"); });
       await page.getByRole("button", { name: "Next", exact: true }).first().click();
       await page.locator('#live output[data-slide-selected="1"]').waitFor();

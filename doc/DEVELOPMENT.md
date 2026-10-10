@@ -100,16 +100,32 @@ genre renderer's `Output.Html.asString`. Native reference executables import
 only pure fixtures, not VIR's JavaScript-host-dependent renderer.
 
 Slides preview covers three horizontal sections, a vertical group, notes,
-inline/block fragments, nested class directives and a basic column-header table.
+inline/block fragments, inline class roles, nested class directives, escaped
+non-Lean code and a basic column-header table.
 Notes/fragments remain visible; ordinary React shell buttons select/highlight a
 source heading while retaining the whole deck. Vertical/background metadata is
 annotated, not converted into Reveal.js grouping/navigation. This is not a
 presenter: arbitrary HTML, slide-specific code/diagrams/animations and row-header
-or striped tables remain named fallbacks. Basic tables use Cast's preview styles,
-not every Reveal.js style flag. Math remains source. Blog's stored hidden
+or striped tables remain named fallbacks. Tables with separator/custom-padding
+flags are also declined; supported tables use Cast's preview styles rather than
+faithfully matching Reveal.js's border flag. Math remains source. Blog's stored hidden
 hover messages are excluded from the visible-code comparison; Cast does not
 implement those hovers. Cross-backend checks are bounded content observations,
 not a promise of identical themes, wrappers or generated sites.
+
+The optional adapter's single factory is `CastSlides.createRenderers styles`,
+in [CastSlides.Renderers](../tests/slides/CastSlides/Renderers.lean); the demo
+component separately owns navigation and React state. It currently accepts
+string attributes `class`, `id`, `title`, `role`, `lang`, `dir`, `aria-label`,
+`aria-hidden`, `aria-labelledby`, `aria-describedby`, and lowercase `data-*`
+names (excluding Cast's `data-verso-*` namespace). A rejected field declines the
+whole extension, preserving its children in a named fallback. No HTML style
+parser, event-string evaluator or arbitrary React-prop conversion is supplied.
+Generic wrappers have neutral styles so consumer layout classes can take effect.
+Keys/values and fragment indices are converted once per extension; nested
+decorators apply inner-first, outer-last. The contract checks include React
+reserved props, malformed attribute names, table declines and single child
+consumption. Non-Lean code is source-preserving, not syntax-highlighted.
 
 ## Lean reference manual validation
 

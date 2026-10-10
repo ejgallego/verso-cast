@@ -5,6 +5,7 @@ module
 public import VersoSlides.Basic
 public import Verso.Doc.Concrete
 public meta import VersoSlides.Directives
+public meta import VersoSlides.OtherLanguages
 open VersoSlides
 
 #doc (Slides) "Slides Preview" =>
@@ -58,3 +59,9 @@ Sub-slide B, with {fragment (style := highlightRed)}[inline emphasis].
 :::
 
 Inline math stays as source: $`x^2 + y^2`.
+
+An inline {class "slide-badge"}[class role] and escaped source:
+
+```code javascript
+const message = "<escaped>";
+```
