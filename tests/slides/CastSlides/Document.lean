@@ -65,3 +65,5 @@ An inline {class "slide-badge"}[class role] and escaped source:
 ```code javascript
 const message = "<escaped>";
 ```
+
+A project image: {image "badge.svg" (width := "80px") (height := "32px") (class := "slide-image")}[Cast badge].

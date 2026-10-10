@@ -101,7 +101,7 @@ only pure fixtures, not VIR's JavaScript-host-dependent renderer.
 
 Slides preview covers three horizontal sections, a vertical group, notes,
 inline/block fragments, inline class roles, nested class directives, escaped
-non-Lean code and a basic column-header table.
+non-Lean code, an explicitly published local image and a basic column-header table.
 Notes/fragments remain visible; ordinary React shell buttons select/highlight a
 source heading while retaining the whole deck. Vertical/background metadata is
 annotated, not converted into Reveal.js grouping/navigation. This is not a
@@ -126,6 +126,22 @@ Keys/values and fragment indices are converted once per extension; nested
 decorators apply inner-first, outer-last. The contract checks include React
 reserved props, malformed attribute names, table declines and single child
 consumption. Non-Lean code is source-preserving, not syntax-highlighted.
+
+`createRenderers styles resolveImage` optionally accepts a pure
+`VersoSlides.ImgSrc → Option String` URL mapping. The default preserves remote
+URLs and declines project-relative paths; empty/unresolved URLs keep the named
+fallback and stored children. A browser/VS Code client supplies the mapping and
+asset publishing appropriate to its workspace—Cast does not inspect the
+filesystem or guess a site root. Width/height become fresh native style fields,
+and alt text/class names are preserved. The fixture publishes just `badge.svg`
+into its comparison directory, with an explicit matching map for both backends.
+
+Stored Lean code is the next distinct fidelity boundary: Slides carries
+serialized SubVerso highlighting and a separate `SlideCode` fragment/click/output
+tree. Those remain visible fallbacks for now; a future preview should render
+that typed structure deliberately rather than silently flattening fragments or
+discarding command output. Reveal.js hover/panel behavior is not part of Cast's
+current preview contract.
 
 ## Lean reference manual validation
 

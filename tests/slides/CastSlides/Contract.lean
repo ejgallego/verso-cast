@@ -40,4 +40,20 @@ private def run (kind field : String) : ReactM (Js Node × Nat) := do
 @[vir_export] def visits (kind field : String) : ReactM Nat := do
   return (← run kind field).2
 
+/-- Image paths are resolved by the client; every image has fresh dimensions. -/
+@[vir_export] def renderImages (mapped : Bool) : ReactM (Js Node) := do
+  let styles ← Renderer.Styles.create
+  let resolveImage : ImgSrc → Option String := fun source =>
+    match source with
+    | .projectRelative "known.svg" => if mapped then some "published/known.svg" else none
+    | _ => imageUrl? source
+  let handlers ← createRenderers styles resolveImage
+  let input : Part Slides := .mk #[.text "Images"] "Images" none #[.para #[
+    .other (.image (.remote "https://example.invalid/remote.svg") "Remote <image>" (some "10px") (some "12px") (some "remote-image")) #[],
+    .other (.image (.projectRelative "known.svg") "Local" (some "80px") none (some "local-image")) #[],
+    .other (.image (.projectRelative "missing.svg") "Missing" none none none) #[.text "Unresolved children"],
+    .other (.image (.remote "") "Empty" none none none) #[.text "Empty URL children"]
+  ]] #[]
+  Renderer.render styles input (renderers := handlers)
+
 end CastSlides.Contract

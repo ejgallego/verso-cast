@@ -45,5 +45,31 @@ export function checkSlidesContract(runtime) {
   }
   assert.match(renderToStaticMarkup(render("table")), /<tbody>/);
   assert.equal(visits("table"), 1n, "valid table consumes each cell once");
+  for (const mapped of [false, true]) {
+    const imageTree = runtime.call("CastSlides.Contract.renderImages", mapped);
+    const images = [];
+    const collect = node => {
+      if (!isValidElement(node)) return;
+      if (node.type === "img") images.push(node);
+      Children.forEach(node.props.children, collect);
+    };
+    collect(imageTree);
+    assert.equal(images.length, mapped ? 2 : 1);
+    assert.equal(images[0].props.src, "https://example.invalid/remote.svg");
+    assert.equal(images[0].props.alt, "Remote <image>");
+    assert.equal(images[0].props.style.width, "10px");
+    assert.equal(images[0].props.style.height, "12px");
+    if (mapped) {
+      assert.equal(images[1].props.src, "published/known.svg");
+      assert.equal(images[1].props.style.width, "80px");
+      assert.equal(images[1].props.style.height, undefined, "dimensions do not leak between images");
+      assert.notEqual(images[0].props.style, images[1].props.style);
+    }
+    const html = renderToStaticMarkup(imageTree);
+    assert.match(html, /Slides.image/);
+    assert.match(html, /Unresolved children/);
+    assert.match(html, /Empty URL children/);
+    assert.match(html, /Remote &lt;image&gt;/);
+  }
   console.log(`Slides adapter contract: ${rejected.length * 3} attribute declines, nested props/focus, tables and single consumption PASS`);
 }

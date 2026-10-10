@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -40,6 +40,10 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
     }
     const directory = resolve(root, "_out/genres", name);
     await stageProgram(spec.target, directory, { cwd: spec.cwd });
+    if (name === "slides") {
+      await mkdir(resolve(directory, "images"), { recursive: true });
+      await copyFile(resolve(spec.cwd, "CastSlides/badge.svg"), resolve(directory, "images/badge.svg"));
+    }
     await build({ absWorkingDir: root, entryPoints: ["tests/browser/genre-comparison.mjs"],
       outfile: resolve(directory, "comparison.js"), bundle: true, format: "esm", target: "es2022" });
     await writeFile(resolve(directory, "cast.html"), cast);
@@ -76,6 +80,7 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
           headings: collect("h1,h2,h3,h4,h5,h6", node => [node.tagName, normalize(node.textContent)]),
           byline: collect("[data-post-byline]"),
           links: collect("a", node => [node.getAttribute("href"), normalize(node.textContent)]),
+          images: collect("img", node => [node.getAttribute("src"), node.getAttribute("alt"), node.style.width, node.style.height]),
           code: [...root.querySelectorAll("pre,code.hl.lean.block")]
             .filter(node => !node.parentElement.closest("pre"))
             .map(node => {
@@ -127,6 +132,11 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
       assert.equal(await page.locator("#live .r-hstack").evaluate(node => getComputedStyle(node).display), "flex",
         "authored layout classes are not overridden by a default inline grid");
       assert.ok(observations.live.code.includes('const message = "<escaped>";'));
+      assert.deepEqual(observations.live.images, [["images/badge.svg", "Cast badge", "80px", "32px"]]);
+      await page.waitForFunction(() => {
+        const image = document.querySelector("#live .slide-image");
+        return image?.complete && image.naturalWidth === 80;
+      });
       await page.evaluate(() => { window.retainedHeading = document.querySelector("#live h2"); });
       await page.getByRole("button", { name: "Next", exact: true }).first().click();
       await page.locator('#live output[data-slide-selected="1"]').waitFor();

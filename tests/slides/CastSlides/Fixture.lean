@@ -9,9 +9,16 @@ open Verso Verso.Doc VersoSlides
 
 def document : Part Slides := %doc CastSlides.Document
 
+/-- The demo publishes exactly one local asset; unknown paths are not guessed. -/
+def previewImageUrl? : ImgSrc → Option String
+  | .remote url => some url
+  | .projectRelative "CastSlides/badge.svg" => some "images/badge.svg"
+  | .projectRelative _ => none
+
 def standardHtml : IO String := do
   let context : Html.HtmlT.Context Slides := {
-    options := {}, traverseContext := (), traverseState := {},
+    options := {}, traverseContext := (),
+    traverseState := { imageFiles := ({} : Std.HashMap String String).insert "CastSlides/badge.svg" "badge.svg" },
     definitionIds := {}, linkTargets := {}, codeOptions := {} }
   let logger ← Logger.new
   let (html, _) ← (renderDocument {} document : Html.HtmlT Slides (BuildLogT IO) Output.Html) context {} |>.run logger

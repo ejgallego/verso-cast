@@ -14,7 +14,7 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 owns neither presentation navigation nor a second imperative DOM runtime. -/
 @[vir_export] def View : ReactM (FunctionComponent Props) := do
   let styles ← Renderer.Styles.create
-  let handlers ← createRenderers styles
+  let handlers ← createRenderers styles previewImageUrl?
   let initial ← LeanRef.toJSL (0 : Nat)
   let next ← Js.Function.ofLean fun (previous : JSL Nat) => do
     LeanRef.toJSL (min document.subParts.size ((← LeanRef.fromJSL previous) + 1))

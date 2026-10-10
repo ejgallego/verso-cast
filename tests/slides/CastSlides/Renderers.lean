@@ -44,10 +44,18 @@ private def prepareAttributes (styles : Renderer.Styles) (fields : Array (String
       if append then Renderer.appendClass props styles.strings.keys.className value
       else Js.Object.set props key value
 
+/-- Remote URLs are already document URLs. Local paths need a consumer mapping,
+not an assumption about the browser's cwd or generated site's image directory. -/
+def imageUrl? : ImgSrc → Option String
+  | .remote url => some url
+  | .projectRelative _ => none
+
 /-- A bounded raw-document preview adapter, independent of navigation/state.
 Create once per component factory. Notes/fragments stay visible. Unsupported
-markup keeps named fallbacks; no Reveal.js runtime or traversal is installed. -/
-def createRenderers (styles : Renderer.Styles) : ReactM (Renderer.Renderers Slides) := do
+markup keeps named fallbacks; no Reveal.js runtime or traversal is installed.
+The optional image resolver is pure and consumer-owned; it publishes no assets. -/
+def createRenderers (styles : Renderer.Styles)
+    (resolveImage : ImgSrc → Option String := imageUrl?) : ReactM (Renderer.Renderers Slides) := do
   let tables ← Renderer.Table.Styles.create
   -- Authored layout classes must not fight Cast's section-grid defaults.
   let wrapperStyle ← Js.Object.empty
@@ -66,6 +74,17 @@ def createRenderers (styles : Renderer.Styles) : ReactM (Renderer.Renderers Slid
         let props ← js%{ "key" := (← JsValue.ofString key), "className" := (← js#"") }
         apply props
         return some (← <span @props={props}>{Js.Array.ofArray (← children ())}</span>)
+      | .image source alt width height cssClass =>
+        let some url := resolveImage source | return none
+        if url.isEmpty then return none
+        -- Fresh style props: never mutate a shared factory style with dimensions.
+        let imageStyle ← js%{ "maxWidth" := (← js#"100%"), "verticalAlign" := (← js#"middle") }
+        if let some width := width then Js.Object.set imageStyle (← js#"width") (← JsValue.ofString width)
+        if let some height := height then Js.Object.set imageStyle (← js#"height") (← JsValue.ofString height)
+        let classes := if width.isSome || height.isSome then
+          "explicit-size" ++ (cssClass.map (" " ++ ·)).getD "" else cssClass.getD ""
+        return some (← <img key={← JsValue.ofString key} src={← JsValue.ofString url}
+          alt={← JsValue.ofString alt} className={← JsValue.ofString classes} style={imageStyle}/>)
       | _ => return none
     renderBlock? := fun key attributes extension children => do
       match extension with
