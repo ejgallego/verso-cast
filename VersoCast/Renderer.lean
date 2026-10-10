@@ -307,15 +307,17 @@ private def blockProps
     (identity : Identity)
     (kind : String)
     (style : Js Props)
-    (changed focused : Bool) : ReactM (Js Props) := do
+    (changed focused : Bool)
+    (decorate : Option (Js Props → ReactM Unit) := none) : ReactM (Js Props) := do
   let props ← Js.Object.empty
   Js.Object.set props styles.strings.keys.style style
   let classes := if focused then
     if changed then "vir-verso-block vir-verso-block-changed vir-verso-block-focused"
     else "vir-verso-block vir-verso-block-focused"
   else if changed then "vir-verso-block vir-verso-block-changed" else "vir-verso-block"
-  Js.Object.set props styles.strings.keys.key (← JsValue.ofString identity.reactKey)
   Js.Object.set props styles.strings.keys.className (← JsValue.ofString classes)
+  if let some decorate := decorate then decorate props
+  Js.Object.set props styles.strings.keys.key (← JsValue.ofString identity.reactKey)
   Js.Object.set props styles.strings.keys.dataVersoBlock (← JsValue.ofString identity.debugPath)
   Js.Object.set props styles.strings.keys.dataVersoKind (← JsValue.ofString kind)
   if debug then
@@ -452,9 +454,10 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
     (changedIds : Array String)
     (focus : Option String)
     (debug : Bool)
+    (decorate : Option (Js Props → ReactM Unit))
     (identity : Identity) : _root_.Verso.Doc.Block g → ReactM (Lean.Vir.Js Node)
   | .para content => do
-      let props ← blockProps styles debug identity "paragraph" (styles.paragraph) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "paragraph" (styles.paragraph) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← renderInlines styles renderers content
       return ← <p @props={props}>{Js.Array.ofArray children}</p>
   | .code source => do
@@ -462,24 +465,24 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
       let codeProps ← Js.Object.empty
       Js.Object.set codeProps styles.strings.keys.dataLanguage styles.strings.values.empty
       let code ← <code @props={codeProps}>{pure text}</code>
-      let props ← blockProps styles debug identity "code" (styles.codeBlock) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "code" (styles.codeBlock) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       return ← <pre @props={props}>{pure code}</pre>
   | .ul items => do
-      let props ← blockProps styles debug identity "unordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "unordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       return ← <ul @props={props}>{Js.Array.ofArray children}</ul>
   | .ol start items => do
-      let props ← blockProps styles debug identity "ordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "ordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       Js.Object.set props styles.strings.keys.start (← JsValue.ofString (toString start))
       let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       return ← <ol @props={props}>{Js.Array.ofArray children}</ol>
   | .dl items => do
       let children ← items.mapIdxM fun index item =>
         renderDescItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
-      let props ← blockProps styles debug identity "description-list" (styles.descriptionList) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "description-list" (styles.descriptionList) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       return ← <dl @props={props}>{Js.Array.ofArray children.flatten}</dl>
   | .blockquote content => do
-      let props ← blockProps styles debug identity "blockquote" (styles.blockquote) (changedIds.contains identity.debugPath) (focus == some identity.debugPath)
+      let props ← blockProps styles debug identity "blockquote" (styles.blockquote) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
       return ← <blockquote @props={props}>{Js.Array.ofArray children}</blockquote>
   | .concat content => do
@@ -490,14 +493,20 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
       Node.fragment props
         (← Js.Array.ofArray
           (← renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
-            (focusChildren := focus == some identity.debugPath)))
+            (focusChildren := focus == some identity.debugPath) (decorate := decorate)))
   | .other extension content => do
       let changed := changedIds.contains identity.debugPath
       let focused := focus == some identity.debugPath
-      let attributes := fun kind style => blockProps styles debug identity kind style changed focused
+      let attributes := fun kind style => blockProps styles debug identity kind style changed focused decorate
       let children : BlockChildren := {
         render := fun _ =>
           renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
+        renderWith := fun inner =>
+          renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
+            (focusChildren := focused)
+            (decorate := some fun props => do
+              inner props
+              if let some outer := decorate then outer props)
         splitParagraph? := fun _ => do
           let some first := content[0]? | none
           let .para inlines := first | none
@@ -508,7 +517,7 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
               (changedIds.contains leading.debugPath) (focus == some leading.debugPath)
             return (props, ← renderInlines styles renderers inlines)
           let body : Unit → ReactM (Array (Js Node)) := fun _ => (content.extract 1 content.size).mapIdxM fun index block =>
-            renderBlock styles renderers fingerprint changedIds focus debug identities[index + 1]! block
+            renderBlock styles renderers fingerprint changedIds focus debug none identities[index + 1]! block
           some (summary, body)
         listItems? := fun _ => do
           let #[.ul items] := content | none
@@ -577,13 +586,14 @@ where
       (debug : Bool)
       (parentSemanticKey debugParent : String)
       (content : Array (_root_.Verso.Doc.Block g))
-      (focusChildren : Bool := false) :
+      (focusChildren : Bool := false)
+      (decorate : Option (Js Props → ReactM Unit) := none) :
       ReactM (Array (Lean.Vir.Js Node)) := do
     let identities := blockIdentities renderers parentSemanticKey debugParent content fingerprint
     content.mapIdxM fun index block =>
       let identity := identities[index]!
       renderBlock styles renderers fingerprint changedIds
-        (if focusChildren then some identity.debugPath else focus) debug identity block
+        (if focusChildren then some identity.debugPath else focus) debug decorate identity block
 
 private partial def renderPart (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
     (changedIds : Array String)
@@ -604,7 +614,7 @@ private partial def renderPart (styles : Styles) (renderers : Renderers g) (fing
     (changedIds.contains headingIdentity.debugPath) (focus == some headingIdentity.debugPath) header?
   let identities := blockIdentities renderers identity.semanticKey identity.debugPath part.content fingerprint
   let content ← part.content.mapIdxM fun index block =>
-    renderBlock styles renderers fingerprint changedIds focus debug identities[index]! block
+    renderBlock styles renderers fingerprint changedIds focus debug none identities[index]! block
   let partIdentities := partIdentities renderers identity.semanticKey identity.debugPath part.subParts fingerprint
   let subParts ← part.subParts.mapIdxM fun index child =>
     renderPart styles renderers fingerprint changedIds focus debug partIdentities[index]! (level + 1) child

@@ -6,7 +6,7 @@ public import Vir.ProofWidgets.Jsx
 public import SubVerso.Highlighting
 
 public section
-namespace VersoCast.Manual.Highlighting
+namespace VersoCast.Highlighting
 open Lean.Vir Lean.Vir.React SubVerso.Highlighting
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
@@ -76,4 +76,4 @@ private partial def renderAt (styles : Styles) (key : String) : Highlighted → 
 def render (styles : Styles) (value : Highlighted) : ReactM (Js Node) :=
   renderAt styles "root" value
 
-end VersoCast.Manual.Highlighting
+end VersoCast.Highlighting

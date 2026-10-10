@@ -58,4 +58,27 @@ private def renderers : Renderer.Renderers Fixture.genre where
     changedIds := #["part-root-block-1-block-1-block-0"]
   } renderers
 
+/-- Transparent root decoration must not change keys, addresses or skip hidden
+children's policy. A normal wrapper decorates only its own root. -/
+@[vir_export] def renderDecorated (focusPath : String) : ReactM (Js Node) := do
+  let styles ← Renderer.Styles.create
+  let suffix ← js#" decorated"
+  let handlers : Renderer.Renderers Fixture.genre := { renderers with
+    renderBlock? := fun key attributes extension children => do
+      match extension with
+      | .notice =>
+        let nodes ← children.renderWith fun props => do
+          Renderer.appendClass props styles.strings.keys.className suffix
+          -- Reserved values are restored by Cast after client decoration.
+          Js.Object.set props styles.strings.keys.key (← js#"not-a-key")
+          Js.Object.set props styles.strings.keys.dataVersoBlock (← js#"not-a-path")
+        return some (← Node.fragment (← js%{ "key" := (← JsValue.ofString key) }) (← Js.Array.ofArray nodes))
+      | _ => renderers.renderBlock? key attributes extension children }
+  let input : Part Fixture.genre := .mk #[.text "Decorated"] "Decorated" none #[
+    .other .notice #[.concat #[Fixture.paragraph "A",
+      .other .notice #[Fixture.paragraph "B"],
+      .blockquote #[Fixture.paragraph "C"],
+      .other .hidden #[Fixture.paragraph "HIDDEN"]]]] #[]
+  Renderer.render styles input { focus := if focusPath.isEmpty then none else some focusPath } handlers
+
 end VersoCastTests.Navigation

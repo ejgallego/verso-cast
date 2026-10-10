@@ -25,7 +25,7 @@ jobs:
         with:
           auto-config: false
           build: true
-          build-args: VersoCast VersoCastTests cast-assets cast-standard-html
+          build-args: VersoCast VersoCastTests cast-assets cast-standard-html cast-blog-html
           test: true
           use-github-cache: false
           use-mathlib-cache: false
@@ -44,3 +44,9 @@ jobs:
           lake build VersoCastExamples
           npm run test:reference-setup
           npm test
+      - name: Check optional Slides consumer
+        run: |
+          cd tests/slides
+          lake build
+          cd ../..
+          npm run test:slides

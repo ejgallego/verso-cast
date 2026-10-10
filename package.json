@@ -12,7 +12,9 @@
     "react": "^19.2.7"
   },
   "scripts": {
-    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math && npm run test:manual",
+    "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math && npm run test:manual && npm run test:blog",
+    "test:blog": "node tests/genre-comparison.mjs blog",
+    "test:slides": "node tests/genre-comparison.mjs slides",
     "test:manual": "node tests/manual-acceptance.mjs",
     "test:showcase": "node tests/showcase-browser.mjs",
     "test:reference-setup": "node --test tests/reference-manual/setup.test.mjs",
@@ -24,6 +26,8 @@
     "test:navigation": "node tests/navigation-acceptance.mjs",
     "compare": "node tests/offline-comparison.mjs",
     "compare:serve": "node tools/compare.mjs",
+    "compare:blog:serve": "node tools/compare.mjs blog",
+    "compare:slides:serve": "node tools/compare.mjs slides",
     "demo": "node tools/demo.mjs"
   },
   "devDependencies": {

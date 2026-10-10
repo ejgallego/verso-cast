@@ -11,7 +11,7 @@ public meta import CastManualPreview.Server
 -- opaque imports alone do not invalidate that snapshot when bodies change.
 meta import all CastManualPreview.Extensions
 meta import all VersoCast.Manual
-meta import all VersoCast.Manual.Highlighting
+meta import all VersoCast.Highlighting
 meta import all VersoCast.Renderer
 meta import all VersoCast.Renderer.Table
 meta import Vir.Attributes

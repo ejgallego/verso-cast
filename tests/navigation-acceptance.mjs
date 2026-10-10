@@ -72,6 +72,16 @@ try {
     for (const node of nodes) assert.equal(node.classes.includes("vir-verso-block-focused"), node.focused);
   }
   assert.doesNotMatch(renderToStaticMarkup(render(b(8))), /HIDDEN/);
+  const decorated = path => runtime.call("VersoCastTests.Navigation.renderDecorated", path);
+  const roots = collect(decorated(""));
+  const visible = roots.filter(node => node.classes.includes("decorated"));
+  assert.deepEqual(visible.map(node => node.tag), ["P", "P", "BLOCKQUOTE"]);
+  assert.equal(visible[1].classes.match(/decorated/g).length, 2, "nested transparent decorators compose");
+  assert.ok(roots.every(node => node.path !== "not-a-path" && node.key !== "not-a-key"));
+  const focusedRoots = collect(decorated(b(0)));
+  assert.deepEqual(signature(focusedRoots), signature(roots), "root decoration preserves identities under focus");
+  assert.deepEqual(focusedRoots.filter(node => node.focused).map(node => node.path), visible.map(node => node.path));
+  assert.doesNotMatch(renderToStaticMarkup(decorated(b(0))), /HIDDEN/);
   console.log(`Navigation SSR: ${cases.length} focus cases, stable keys, independent change markers and clamped custom headings PASS`);
 } finally { runtime.dispose(); }
 

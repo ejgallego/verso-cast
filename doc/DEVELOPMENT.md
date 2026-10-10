@@ -7,7 +7,7 @@ Run from the repository root with Node 24. Build the Lean targets before
 Build widget examples after `npm ci`, because VIR's widget bundle uses npm tooling.
 
 ```sh
-lake build VersoCast VersoCastTests cast-assets cast-standard-html
+lake build VersoCast VersoCastTests cast-assets cast-standard-html cast-blog-html
 lake test
 npm ci
 npx playwright install chromium
@@ -41,6 +41,8 @@ Each npm test below can be run with `npm run <name>`.
 | `test:widget`, `test:showcase` | Live component state, callbacks, retained DOM and disposal |
 | `test:math` | KaTeX SSR/live output, updates, malformed input and macro isolation |
 | `test:manual` | Styled source/output, inline Lean, docstring sections, escaping, fallback and default-off debug metadata |
+| `test:blog` | Real Post source, typed Blog extensions, metadata, live/SSR/Verso essentials and disposal |
+| `test:slides` | Optional pinned Slides consumer, notes/fragments, nested root decoration, tables and retained navigation state |
 
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
@@ -69,6 +71,8 @@ file after preparing the runtime.
 ```sh
 npm run demo
 npm run compare:serve
+npm run compare:blog:serve
+npm run compare:slides:serve
 npm run test:math -- --serve
 ```
 
@@ -84,6 +88,28 @@ universal equivalence requirement. This fixture leaves math as source.
 
 The math demo uses the shared KaTeX leaf for both live and offline output,
 with editable formula source and display mode.
+
+The Blog comparison uses a checked Post with metadata, a JSON lexer, Lean source
+and output. The Slides comparison builds the isolated [test consumer](../tests/slides/lakefile.lean)
+against `leanprover/verso-slides` at `268257a4fbdac12c77be726213b51c3ce3a1d41e`,
+with the same Lean toolchain and Verso revision as Cast. Slides is not a Cast
+library dependency; its adapter remains in test support until its scope is mature.
+Run `npm run test:slides` separately; CI runs it after the root suite. Both
+comparisons use actual genre documents, live React, React SSR and the existing
+genre renderer's `Output.Html.asString`. Native reference executables import
+only pure fixtures, not VIR's JavaScript-host-dependent renderer.
+
+Slides preview covers three horizontal sections, a vertical group, notes,
+inline/block fragments, nested class directives and a basic column-header table.
+Notes/fragments remain visible; ordinary React shell buttons select/highlight a
+source heading while retaining the whole deck. Vertical/background metadata is
+annotated, not converted into Reveal.js grouping/navigation. This is not a
+presenter: arbitrary HTML, slide-specific code/diagrams/animations and row-header
+or striped tables remain named fallbacks. Basic tables use Cast's preview styles,
+not every Reveal.js style flag. Math remains source. Blog's stored hidden
+hover messages are excluded from the visible-code comparison; Cast does not
+implement those hovers. Cross-backend checks are bounded content observations,
+not a promise of identical themes, wrappers or generated sites.
 
 ## Lean reference manual validation
 

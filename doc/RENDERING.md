@@ -44,6 +44,14 @@ are omitted. With positional identities, these views prepare children in linear
 time; opt-in fingerprinting retains its own documented cost.
 The genre-independent `Renderer.Table` helper groups those cells, styles headers
 and emits explicit `thead`/`tbody`; malformed dimensions consume no cells.
+`children.renderWith decorate` decorates each visible child root's fresh props
+while constructing it, without inspecting or cloning finished React nodes.
+Concatenations forward the decorator; transparent extension adapters can forward
+it by choosing `renderWith` themselves. Ordinary wrappers receive it only on
+their own root. Nested decorators run inner-first, outer-last. Preserve source
+and identity fields; Cast writes its reserved key/navigation fields afterward.
+Use `Renderer.appendClass` with a cached native suffix (including a leading
+space) to append classes without a Lean/native string round trip per child.
 These helpers are not hook scopes: do not call React hooks inside them.
 Inline extensions must return phrasing content. Cast footnotes use inline
 `span`/`sup` markup rather than invalid `details` inside paragraphs.
@@ -132,6 +140,22 @@ block extension.
 
 Ordered lists preserve their signed `start` value, including negative values
 and zero.
+
+## Blog pages and posts
+
+Import `VersoCast.Blog` and call `Blog.createRenderers genre styles` once in the
+factory. It accepts both `Verso.Genre.Blog.Page` and `Verso.Genre.Blog.Post`
+through their `BlogGenre` instances. It handles highlighted Lean, stored compiler
+messages, lexed text, HTML spans/divs and docstring containers. Both Blog and
+Manual share `VersoCast.Highlighting`; highlighting is not Manual-specific.
+
+This is a raw-document adapter, not a blog site generator. The client owns
+publication metadata, heading IDs, dates/authors and themes. References, registered
+site components, arbitrary HTML blobs/wrappers/details and docstring sections
+retain named fallbacks. Stored hover data is not interactive, and message summary
+flags do not add expandable UI. No site traversal or script loading is copied.
+The [Post comparison fixture](../tests/VersoCastTests/Blog.lean) illustrates the
+metadata hook and assigns distinct DOM ID prefixes to each document instance.
 
 ## Focus and change highlighting
 

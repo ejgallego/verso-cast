@@ -24,6 +24,10 @@ No child rendering happens while inspecting the shape. -/
 structure BlockChildren where
   /-- Ordinary block nodes, including their paragraph/list wrappers. -/
   render : Unit → ReactM (Array (Js Node))
+  /-- Decorate the fresh props of each visible child root during construction.
+  Concatenations and transparent extensions forward the decorator; ordinary
+  wrappers do not push it into descendants. Preserve keys/navigation fields. -/
+  renderWith : (decorate : Js Props → ReactM Unit) → ReactM (Array (Js Node))
   /-- A leading paragraph's attributes/inlines and the remaining block nodes.
   Useful for summaries/captions without creating a discarded paragraph node. -/
   splitParagraph? : Unit → Option
@@ -85,6 +89,12 @@ structure Attribute where
 conversion, native allocation or host call; the small Lean record can be cached. -/
 @[inline] def Attribute.of {α : Type} (name : Js String) (value : Js α) : Attribute :=
   { name, value := by unfold Js.Any Js at *; exact value }
+
+/-- Append a native class suffix (including its leading space) to fresh block
+props. Cache the suffix once per extension, not once per child. -/
+def appendClass (props : Js Props) (classKey suffix : Js String) : ReactM Unit := do
+  let current ← Js.String.fromAny (← Js.Object.get props classKey)
+  Js.Object.set props classKey (← Js.String.concat current suffix)
 
 /-- Options computed by the stateful component before constructing the Verso VDOM. -/
 structure Options (g : Doc.Genre) where

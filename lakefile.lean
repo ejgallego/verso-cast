@@ -28,6 +28,10 @@ lean_exe «cast-standard-html» where
   srcDir := "tests"
   root := `OfflineComparison
 
+lean_exe «cast-blog-html» where
+  srcDir := "tests"
+  root := `BlogComparison
+
 -- Optional live example; the renderer library does not import Infoview.
 lean_lib VersoCastExamples where
   srcDir := "examples"

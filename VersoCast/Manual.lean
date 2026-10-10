@@ -3,7 +3,7 @@ Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Renderer
 public import VersoManual.Basic
-public import VersoCast.Manual.Highlighting
+public import VersoCast.Highlighting
 public import VersoCast.Renderer.Table
 public import VersoManual.Table
 public import VersoManual.Docstring
