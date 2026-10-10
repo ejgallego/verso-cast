@@ -71,5 +71,41 @@ export function checkSlidesContract(runtime) {
     assert.match(html, /Empty URL children/);
     assert.match(html, /Remote &lt;image&gt;/);
   }
-  console.log(`Slides adapter contract: ${rejected.length * 3} attribute declines, nested props/focus, tables and single consumption PASS`);
+  const renderCode = (source, block, simple = false) => runtime.call("CastSlides.Contract.renderCode", source, block, simple);
+  for (const block of [false, true]) {
+    const tree = renderCode("", block);
+    const html = renderToStaticMarkup(tree);
+    assert.match(html, /fragment fade-up/);
+    assert.match(html, /data-fragment-index="7"/);
+    assert.match(html, /data-slide-code-block="true"/);
+    assert.match(html, /fragment slide-click-only/);
+    assert.match(html, /data-fragment-index="9"/);
+    assert.match(html, /data-tactic-range="4-12"/);
+    assert.match(html, /has-info warning/);
+    assert.match(html, /command-output error/);
+    assert.match(html, /verso-message information/);
+    assert.match(html, /&lt;failure&gt;/);
+    assert.doesNotMatch(html, /HIDDEN HOVER|FALLBACK SOURCE|extension:/);
+    if (block) {
+      assert.match(html, /data-slide-panel-requested="true"/);
+      assert.match(html, /r-stretch/);
+    }
+    // No invalid block elements nested inside an inline code tree.
+    assert.doesNotMatch(html, /<div/);
+    const siblingKeys = node => {
+      if (!isValidElement(node)) return;
+      const elements = [];
+      Children.forEach(node.props.children, child => { if (isValidElement(child)) elements.push(child); });
+      assert.equal(new Set(elements.map(node => node.key)).size, elements.length, "code sibling keys are distinct");
+      elements.forEach(siblingKeys);
+    };
+    siblingKeys(tree);
+    assert.match(renderToStaticMarkup(renderCode("", block, true)), /simple &lt;code&gt;/);
+    for (const source of ["not JSON", "{}", JSON.stringify({ nextKey: 1, tokens: { bad: {} }, messageContents: {}, goals: {}, code: {}, top: null })]) {
+      const fallback = renderToStaticMarkup(renderCode(source, block));
+      assert.match(fallback, /Slides.slideCode/);
+      assert.match(fallback, /FALLBACK SOURCE/);
+    }
+  }
+  console.log(`Slides adapter contract: ${rejected.length * 3} attribute declines, nested props/focus, tables, images, typed code/keys and export errors PASS`);
 }

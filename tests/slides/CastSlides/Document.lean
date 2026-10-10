@@ -6,6 +6,7 @@ public import VersoSlides.Basic
 public import Verso.Doc.Concrete
 public meta import VersoSlides.Directives
 public meta import VersoSlides.OtherLanguages
+public meta import VersoSlides.InlineLean
 open VersoSlides
 
 #doc (Slides) "Slides Preview" =>
@@ -67,3 +68,11 @@ const message = "<escaped>";
 ```
 
 A project image: {image "badge.svg" (width := "80px") (height := "32px") (class := "slide-image")}[Cast badge].
+
+Lean source and its output:
+
+```lean -panel -stretch
+#eval 2 + 3
+```
+
+An inline Lean term: {lean}`(2 + 3 : Nat)`.

@@ -73,7 +73,9 @@ private partial def renderAt (styles : Styles) (key : String) : Highlighted → 
   | .span _ content | .tactics _ _ _ content => renderAt styles key content
   | .point .. => do Node.text (← js#"")
 
-def render (styles : Styles) (value : Highlighted) : ReactM (Js Node) :=
-  renderAt styles "root" value
+/-- The caller may provide a sibling-local root key when composing highlighting
+leaves into another typed renderer. Descendant token keys stay local. -/
+def render (styles : Styles) (value : Highlighted) (key : String := "root") : ReactM (Js Node) :=
+  renderAt styles key value
 
 end VersoCast.Highlighting

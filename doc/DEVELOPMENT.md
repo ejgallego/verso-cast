@@ -136,12 +136,24 @@ filesystem or guess a site root. Width/height become fresh native style fields,
 and alt text/class names are preserved. The fixture publishes just `badge.svg`
 into its comparison directory, with an explicit matching map for both backends.
 
-Stored Lean code is the next distinct fidelity boundary: Slides carries
-serialized SubVerso highlighting and a separate `SlideCode` fragment/click/output
-tree. Those remain visible fallbacks for now; a future preview should render
-that typed structure deliberately rather than silently flattening fragments or
-discarding command output. Reveal.js hover/panel behavior is not part of Cast's
-current preview contract.
+Stored Lean code uses the shared Cast token styles, including inline terms and
+names. The adapter reconstructs SubVerso highlighting or the typed `SlideCode`
+tree using the existing upstream export schema. Fragments keep their style/index;
+click targets remain marked but are not interactive. Tactic ranges and diagnostic
+severity remain annotated; hidden hover/goals DOM is omitted. Command output
+renders escaped severity-styled text, not an interactive trace/goal view. Block
+code fragments and output use block-styled spans so both inline and block code
+remain valid phrasing content. Source text is not duplicated from the extension's
+fallback children after a successful decode.
+
+The decoder currently runs per render, with no transport converter or retained
+cache. It returns `Except` errors for malformed JSON, bad decimal table keys,
+schema errors and missing references; the adapter then keeps the named fallback
+and original children. Inputs are checked compiler exports, not hostile arbitrary
+reference graphs: cyclic graphs/resource limits are not validated here. Panel
+requests and stretch classes are annotated, but no Reveal.js panel/hover/reveal
+runtime is installed. The comparison includes real elaborated Lean code and an
+inline term; synthetic tests cover fragments, clicks, outputs and malformed data.
 
 ## Lean reference manual validation
 

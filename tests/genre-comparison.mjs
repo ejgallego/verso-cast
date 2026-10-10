@@ -87,7 +87,7 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
               const copy = node.cloneNode(true);
               // Stored hover messages are not visible code; Cast's initial
               // token presentation deliberately does not implement hovers.
-              copy.querySelectorAll(".hover-container").forEach(node => node.remove());
+              copy.querySelectorAll(".hover-container,.hover-info,.tactic-state").forEach(node => node.remove());
               return copy.textContent.trim();
             }),
           emphasis: collect("em"), notes: collect("aside.notes"),
@@ -132,6 +132,9 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
       assert.equal(await page.locator("#live .r-hstack").evaluate(node => getComputedStyle(node).display), "flex",
         "authored layout classes are not overridden by a default inline grid");
       assert.ok(observations.live.code.includes('const message = "<escaped>";'));
+      assert.ok(await page.locator("#live [data-verso-token]").count(), "real Lean tokens use shared highlighting");
+      assert.equal((await page.locator("#live .command-output").textContent()).trim(), "5",
+        "real elaborated command output remains visible");
       assert.deepEqual(observations.live.images, [["images/badge.svg", "Cast badge", "80px", "32px"]]);
       await page.waitForFunction(() => {
         const image = document.querySelector("#live .slide-image");

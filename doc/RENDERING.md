@@ -63,6 +63,11 @@ Math defaults to source-preserving output; a caller can supply a stable
 `mathComponent?` leaf. The optional [KaTeX leaf](../js/katex.mjs) is shared by live
 React and offline SSR; the core Lean renderer does not depend on KaTeX.
 
+For typed token output, import `VersoCast.Highlighting`.
+`Highlighting.render styles value key` accepts an optional sibling-local root
+key when composing typed highlighting leaves. It defaults to `"root"` for the
+standalone case; descendant token keys remain local to their own sequence.
+
 The [standalone showcase](../examples/VersoCastShowcase.lean) is a complete,
 checked client: it defines a genre, creates styles once, supplies all three hooks
 and renders a document with ordinary React checkbox state. Its `renderInline?`

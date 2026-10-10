@@ -56,4 +56,27 @@ private def run (kind field : String) : ReactM (Js Node × Nat) := do
   ]] #[]
   Renderer.render styles input (renderers := handlers)
 
+private def sampleCode : SlideCode := .seq #[
+  .hl (.token { kind := .unknown, content := "start\n" }),
+  .hl (.token { kind := .unknown, content := "second\n" }),
+  .fragment { style := some "fade-up", index := some 7 } true (.hl (.text "block\n")),
+  .fragment { style := none, index := none } false (.hl (.text "<inline>")),
+  .click (.hl (.text "click")) (some 9),
+  .tactics #[] 4 12 (.hl (.text "tactic")),
+  .span #[(.warning, .text "HIDDEN HOVER")] (.hl (.text "warn")),
+  .commandOutput #[(.info, .text "5"), (.error, .text "<failure>")] ]
+
+/-- Exercise both stored export formats through the actual adapter. -/
+@[vir_export] def renderCode (source : String) (block simple : Bool) : ReactM (Js Node) := do
+  let styles ← Renderer.Styles.create
+  let handlers ← createRenderers styles
+  let encoded := if !source.isEmpty then source else
+    if simple then SubVerso.Highlighting.hlToExport (.text "simple <code>") else scToExport sampleCode
+  let content : Array (Block Slides) := if block then
+    #[.other (if simple then .leanCode encoded true else .slideCode encoded true true)
+      #[.code "FALLBACK SOURCE"]]
+    else #[.para #[.other (if simple then .leanCode encoded else .slideCode encoded)
+      #[.text "FALLBACK SOURCE"]]]
+  Renderer.render styles (.mk #[.text "Code"] "Code" none content #[]) (renderers := handlers)
+
 end CastSlides.Contract

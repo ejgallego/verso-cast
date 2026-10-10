@@ -4,6 +4,7 @@ module
 public import VersoCast
 public import VersoCast.Renderer.Table
 public import VersoSlides.Render
+public import CastSlides.Code
 
 public section
 namespace CastSlides
@@ -60,6 +61,7 @@ def createRenderers (styles : Renderer.Styles)
   -- Authored layout classes must not fight Cast's section-grid defaults.
   let wrapperStyle ← Js.Object.empty
   let fragmentKey ← js#"data-fragment-index"
+  let code ← Code.Styles.create
   return {
     blockName, inlineName
     renderInline? := fun key extension children => do
@@ -85,6 +87,14 @@ def createRenderers (styles : Renderer.Styles)
           "explicit-size" ++ (cssClass.map (" " ++ ·)).getD "" else cssClass.getD ""
         return some (← <img key={← JsValue.ofString key} src={← JsValue.ofString url}
           alt={← JsValue.ofString alt} className={← JsValue.ofString classes} style={imageStyle}/>)
+      | .leanCode source | .name source =>
+        let .ok highlighted := Code.decodeHighlighted source | return none
+        return some (← <code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
+          {VersoCast.Highlighting.render code.highlighting highlighted}</code>)
+      | .slideCode source =>
+        let .ok contents := Code.decode source | return none
+        return some (← <code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
+          {Code.render code "content" contents}</code>)
       | _ => return none
     renderBlock? := fun key attributes extension children => do
       match extension with
@@ -113,6 +123,19 @@ def createRenderers (styles : Renderer.Styles)
         return some (← <pre @props={props}><code
           className={← JsValue.ofString s!"language-{language}"}
           data-language={← JsValue.ofString language}>{ProofWidgets.Html.text code}</code></pre>)
+      | .leanCode source panel =>
+        let .ok highlighted := Code.decodeHighlighted source | return none
+        let props ← attributes "lean" code.highlighting.block
+        Js.Object.set props (← js#"data-slide-panel-requested") (← JsValue.ofBool panel)
+        return some (← <pre @props={props}><code className={← js#"hl lean block"}>
+          {VersoCast.Highlighting.render code.highlighting highlighted}</code></pre>)
+      | .slideCode source panel stretch =>
+        let .ok contents := Code.decode source | return none
+        let props ← attributes "lean" code.highlighting.block
+        Js.Object.set props (← js#"data-slide-panel-requested") (← JsValue.ofBool panel)
+        if stretch then Renderer.appendClass props styles.strings.keys.className (← js#" r-stretch")
+        return some (← <pre @props={props}><code className={← js#"hl lean block"}>
+          {Code.render code "content" contents}</code></pre>)
       | .table columns style =>
         -- Preview styles only: unsupported semantic/styling features stay
         -- visible instead of being silently treated as ordinary cells.
