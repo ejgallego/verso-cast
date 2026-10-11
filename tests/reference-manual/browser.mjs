@@ -15,6 +15,14 @@ const showStatic = index => {
   const pane = document.getElementById("ssr");
   if (pane) pane.innerHTML = staticPages[index];
 };
+// Test-only synchronization: act drains React updates/effects and reply handlers,
+// including stale replies. Interactive controls still use ordinary React events.
+async function settle(action) {
+  const previous = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  try { await React.act(async () => { await action(); }); }
+  finally { globalThis.IS_REACT_ACT_ENVIRONMENT = previous; }
+}
 let current = 0, malformed = false, hold = false, pending = [], calls = 0;
 const handlers = new Set();
 const session = { call(method, params, options) {
@@ -23,7 +31,9 @@ const session = { call(method, params, options) {
   calls++;
   const result = malformed ? "not JSON" : documents[current];
   // Deliberately ignore abort for held replies: the Lean active guard must work.
-  if (hold) return new Promise(resolve => pending.push(() => resolve(result)));
+  if (hold) return new Promise(resolve => pending.push({
+    signal: options.abortSignal, resolve: () => resolve(result),
+  }));
   if (options.abortSignal.aborted) return Promise.reject(Error("aborted"));
   return Promise.resolve(result);
 } };
@@ -69,17 +79,25 @@ const editExample = text => {
 window.manualPreview = {
   get calls() { return calls; },
   get subscriptions() { return handlers.size; },
-  select(index) {
+  get pendingCount() { return pending.length; },
+  get abortedCount() { return pending.filter(reply => reply.signal.aborted).length; },
+  async select(index) {
     if (!pages[index]) throw Error("unknown sample page");
     current = index; uri = `file:///${pages[index].module.replaceAll(".", "/")}.lean`;
     const picker = document.getElementById("sample");
     if (picker) picker.value = String(index);
-    showStatic(index); render();
+    showStatic(index); await settle(render);
   },
-  edit, editExample, render,
-  malformed(value) { malformed = value; edit(); },
+  edit: target => settle(() => edit(target)),
+  editExample: text => settle(() => editExample(text)),
+  render: () => settle(render),
+  malformed: value => settle(() => { malformed = value; edit(); }),
   hold(value) { hold = value; },
-  release() { const replies = pending; pending = []; replies.forEach(resolve => resolve()); },
+  async release() {
+    const replies = pending; pending = [];
+    await settle(() => { replies.forEach(reply => reply.resolve()); });
+    return replies.length;
+  },
   dispose() { try { root.unmount(); } finally { runtime.dispose(); } },
 };
 const picker = document.getElementById("sample");
@@ -88,4 +106,4 @@ if (picker) {
   picker.addEventListener("change", () => window.manualPreview.select(Number(picker.value)));
 }
 showStatic(0);
-render();
+await settle(render);

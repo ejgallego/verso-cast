@@ -49,6 +49,7 @@ Each npm test below can be run with `npm run <name>`.
 | Consumer `lake build` | Public root import, generic extension hooks, headings and attributes |
 | Consumer `lake exe consumer` | Native execution of pure identity helpers |
 | `test:git-consumer` | Fresh Git root/subdirectory consumers, pinned dependencies and public APIs |
+| `test:js-package` | Exact npm tarball contents and external KaTeX/React SSR import, using locked test dependencies |
 | `test:renderer` | React nodes, escaping, fallback extensions, keys and change markers |
 | `test:offline` | Verso/SSR/live comparison, lazy extension dispatch and metadata hooks |
 | `test:identity` | State and DOM retention across insertion, reordering, edits and removal |
@@ -63,6 +64,11 @@ Each npm test below can be run with `npm run <name>`.
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
 performance benchmarks.
+
+The optional JavaScript package contains only the math leaf and package/license
+documentation; Lake's Git packages are unaffected. `test:js-package` extracts a
+real npm tarball into a temporary external consumer and uses the installed test
+dependencies without registry access. It does not publish or test npm installation.
 
 The public root re-exports the pure preparation/comparison helpers and React
 renderer. Internal sibling allocation lives in `Renderer/Identity.lean`, shared
@@ -247,7 +253,10 @@ so those body changes rebuild that package despite ordinary opaque imports.
 The replay tests
 decoding, rendering, page changes, edit refresh, stale replies, malformed input
 recovery and disposal, including edits inside an open example. Its RPC transport
-is controlled, not a real VS Code/LSP connection. Screenshots are written under
+is controlled, not a real VS Code/LSP connection. Test actions use React `act`
+to drain updates and effects; the stale-reply gate checks that a request was
+held, aborted on page switch and delivered before asserting the current page.
+Screenshots are written under
 `_out/reference-manual/`.
 
 Each selected page is compared with React SSR from the same decoder/adapter;

@@ -8,11 +8,16 @@
   "exports": {
     "./katex": "./js/katex.mjs"
   },
+  "files": [
+    "js/katex.mjs",
+    "ORIGIN.md"
+  ],
   "peerDependencies": {
     "react": "^19.2.7"
   },
   "scripts": {
     "test:git-consumer": "node tests/git-consumer.mjs",
+    "test:js-package": "node tests/js-package.mjs",
     "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math && npm run test:manual && npm run test:blog",
     "test:blog": "node tests/genre-comparison.mjs blog",
     "test:slides": "node tests/genre-comparison.mjs slides",

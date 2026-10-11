@@ -124,10 +124,8 @@ try {
   await page.evaluate(() => { window.firstHeading = document.querySelector("article h1"); });
   const calls = await page.evaluate(() => window.manualPreview.calls);
   await page.evaluate(() => window.manualPreview.render());
-  await page.waitForTimeout(100);
   assert.equal(await page.evaluate(() => window.manualPreview.calls), calls);
   await page.evaluate(() => window.manualPreview.edit("file:///Unrelated.lean"));
-  await page.waitForTimeout(100);
   assert.equal(await page.evaluate(() => window.manualPreview.calls), calls);
   await page.evaluate(() => window.manualPreview.edit());
   await page.waitForFunction(expected => window.manualPreview.calls > expected, calls);
@@ -137,13 +135,25 @@ try {
   await page.evaluate(() => window.manualPreview.malformed(true));
   await page.getByRole("status").filter({ hasText: "Invalid manual preview:" }).waitFor();
   await heading("Introduction").waitFor();
-  await page.evaluate(() => { window.manualPreview.malformed(false); window.manualPreview.hold(true); window.manualPreview.edit(); });
-  await page.waitForTimeout(100);
-  await page.evaluate(() => { window.manualPreview.hold(false); window.manualPreview.select(1); });
+  await page.evaluate(() => window.manualPreview.malformed(false));
+  await page.evaluate(() => {
+    window.manualPreview.hold(true);
+    return window.manualPreview.edit();
+  });
+  assert.equal(await page.evaluate(() => window.manualPreview.pendingCount), 1,
+    "the stale-reply test must actually hold a request");
+  await page.getByRole("status").filter({ hasText: "Loading page…" }).waitFor();
+  await page.evaluate(() => {
+    window.manualPreview.hold(false);
+    return window.manualPreview.select(1);
+  });
   await heading("The Empty Type").waitFor();
+  assert.equal(await page.evaluate(() => window.manualPreview.abortedCount), 1,
+    "switching pages aborts the held request, whose reply deliberately ignores abort");
   assert.equal((await page.locator("#app").textContent()).includes("[inline extension: Verso.Genre.Manual.InlineLean.Inline.name]"), false);
-  await page.evaluate(() => window.manualPreview.release());
-  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => window.manualPreview.release()), 1,
+    "the stale reply is delivered and its React work drained before checking the page");
+  assert.equal(await page.evaluate(() => window.manualPreview.pendingCount), 0);
   await heading("The Empty Type").waitFor();
   await page.screenshot({ path: resolve(output, "empty.png"), fullPage: true });
   await page.evaluate(() => window.manualPreview.select(0));

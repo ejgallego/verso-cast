@@ -40,6 +40,8 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
+      - name: Check packaged JavaScript helper
+        run: npm run test:js-package
       - name: Check real React SSR and Chromium
         # VIR's widget bundle is built only after root npm tooling is installed.
         run: |
