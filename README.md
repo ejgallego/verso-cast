@@ -71,7 +71,9 @@ runtime assets, individual tests and the three-way HTML comparison.
 
 | Location | Responsibility |
 | --- | --- |
-| `VersoCast/Renderer.lean` | Identity/change helpers and document traversal |
+| `VersoCast/Renderer.lean` | Document-to-React traversal and native props |
+| `VersoCast/Renderer/Changes.lean` | Pure identity preparation and change comparison |
+| `VersoCast/Renderer/Identity.lean` | Internal sibling identity allocation, not root-exported |
 | `VersoCast/Renderer/Config.lean` | Extension hooks, attributes and render options |
 | `VersoCast/Renderer/Style.lean` | Factory-owned native styles |
 | `VersoCast/Fingerprint.lean` | Optional retained identity state |

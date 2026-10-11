@@ -1,6 +1,10 @@
 module
 public import VersoCast
 
+/-- error: Unknown identifier `VersoCast.Renderer.Internal.Identity` -/
+#guard_msgs in
+#check VersoCast.Renderer.Internal.Identity
+
 public def Consumer.renderDocument (styles : VersoCast.Renderer.Styles)
     {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre) :
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=

@@ -48,6 +48,12 @@ Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
 performance benchmarks.
 
+The public root re-exports the pure preparation/comparison helpers and React
+renderer. Internal sibling allocation lives in `Renderer/Identity.lean`, shared
+by comparison and traversal through private imports. Its invariants are checked
+in `tests/VersoCastTests/Identity.lean`; the separate consumer also checks that the
+internal type is not exposed by `import VersoCast`.
+
 ## VS Code showcase
 
 After setup, prepare the runtime and open the example:

@@ -9,6 +9,7 @@ module
 public import VersoCast
 public import VersoCast.Manual
 public import VersoCastTests.Fingerprint
+import VersoCastTests.Identity
 public import VersoCastTests.Offline
 public import VersoCastTests.Retention
 public import VersoCastTests.Math

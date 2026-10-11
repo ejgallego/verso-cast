@@ -6,13 +6,15 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import VersoCast.Renderer.Config
+public import VersoCast.Renderer.Changes
+import VersoCast.Renderer.Identity
 public import Vir.ProofWidgets.Jsx
 public import VersoCast.RenderPath
 public meta import VersoCast.RenderPath
 
-/-! Genre-agnostic identity/change helpers and document-to-React traversal.
-The client-facing hooks and styles are re-exported from `Renderer.Config`. -/
+/-! Genre-agnostic document-to-React traversal.
+Pure preparation/comparison helpers are re-exported from `Renderer.Changes`;
+client hooks and styles come from `Renderer.Config`. -/
 public section
 
 namespace VersoCast.Renderer
@@ -22,6 +24,7 @@ open Lean.Vir.React
 open Lean.Doc.Syntax
 open _root_.Verso
 open Verso.Doc
+open Internal
 
 variable {g : Doc.Genre}
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
@@ -30,276 +33,11 @@ private def applyAttributes (props : Js Props) (attributes : Array Attribute) : 
   for field in attributes do
     Js.Construction.field props field.name field.value
 
-private inductive IdentityOrigin where
-  | structural
-  | explicit
-  | fingerprint
-  | positional
-  deriving BEq, Inhabited
-
-private def IdentityOrigin.label : IdentityOrigin → String
-  | .structural => "structural"
-  | .explicit => "explicit"
-  | .fingerprint => "fingerprint"
-  | .positional => "positional"
-
-private def IdentityOrigin.jsLabel (strings : JsStrings.Fixed) : IdentityOrigin → Js String
+private def Internal.IdentityOrigin.jsLabel (strings : JsStrings.Fixed) : IdentityOrigin → Js String
   | .structural => strings.values.structural
   | .explicit => strings.values.explicit
   | .fingerprint => strings.values.fingerprint
   | .positional => strings.values.positional
-
-/--
-Identity sources are ordered from strongest to weakest. Content-keyed blocks
-reach the fingerprint branch; extension metadata can provide stronger semantic
-identities where the application owns their meaning.
--/
-private structure IdentityHints where
-  explicitId? : Option String := none
-  fingerprint? : Option String := none
-  deriving Inhabited
-
-private structure IdentityBase where
-  reactKey : String
-  friendlyId : String
-  origin : IdentityOrigin
-
-private structure Identity where
-  reactKey : String
-  debugPath : String
-  semanticKey : String
-  friendlyId : String
-  origin : IdentityOrigin
-  deriving Inhabited
-
-private def fingerprintFriendlyId (value : String) : String :=
-  s!"fp-{(hash value : UInt64)}"
-
--- The segment is a fixed internal role; the key is opaque client data and may
--- contain separators. This encoding is separate from React keys and navigation.
-private def semanticChild (parent segment key : String) : String :=
-  s!"{parent}/{segment}/{key.length}:{key}"
-
-private def IdentityHints.resolve
-    (kind : String) (index : Nat) (debugPath : String) (hints : IdentityHints) : IdentityBase :=
-  match hints.explicitId?, hints.fingerprint? with
-  | some value, _ =>
-      { reactKey := s!"explicit:{value}", friendlyId := value, origin := .explicit }
-  | none, some value =>
-      -- The full canonical value stays in the React key. The short hash is
-      -- human-facing only, so collisions cannot alias siblings.
-      { reactKey := s!"fingerprint:{kind}:{value.length}:{value}"
-        friendlyId := fingerprintFriendlyId value
-        origin := .fingerprint }
-  | none, none =>
-      { reactKey := s!"position:{kind}:{index}", friendlyId := debugPath, origin := .positional }
-
-private def allocateSiblingIdentities
-    (parentSemanticKey debugParent segment kind : String)
-    (hints : Array IdentityHints) : Array Identity := Id.run do
-  let mut seen : Std.HashMap String Nat := {}
-  let mut identities := #[]
-  for index in [:hints.size] do
-    let debugPath := RenderPath.child debugParent segment index
-    let base := hints[index]!.resolve kind index debugPath
-    let occurrence := seen.getD base.reactKey 0
-    seen := seen.insert base.reactKey (occurrence + 1)
-    let reactKey := s!"{base.reactKey}:occurrence:{occurrence}"
-    let friendlyId :=
-      if occurrence == 0 then base.friendlyId else s!"{base.friendlyId}~{occurrence}"
-    identities := identities.push {
-      reactKey
-      debugPath
-      semanticKey := semanticChild parentSemanticKey segment reactKey
-      friendlyId
-      origin := base.origin
-    }
-  return identities
-
-private partial def blockIdentitySource (renderers : Renderers g)
-    (block : _root_.Verso.Doc.Block g) : String ⊕ Doc.Block g :=
-  match block with
-  | .concat content =>
-      if content.size == 1 then
-        blockIdentitySource renderers content[0]!
-      else
-        .inr block
-  | .other extension _ =>
-      match renderers.blockIdentity? extension with
-      | some identity => .inl identity
-      | none => .inr block
-  | _ => .inr block
-
-private def blockIdentityHints (renderers : Renderers g) (block : Doc.Block g)
-    (fingerprint : Fingerprint.Value g → Option String) : IdentityHints :=
-  match blockIdentitySource renderers block with
-  | .inl identity => { explicitId? := some identity }
-  | .inr block => { fingerprint? := fingerprint (.inl block) }
-
-private def partIdentityHints
-    (part : _root_.Verso.Doc.Part g)
-    (fingerprint : Fingerprint.Value g → Option String) : IdentityHints :=
-  -- A section title identifies the section without coupling its key to body edits.
-  { fingerprint? := fingerprint (.inr part.title) }
-
-private def blockIdentities (renderers : Renderers g)
-    (parentSemanticKey debugParent : String)
-    (blocks : Array (_root_.Verso.Doc.Block g))
-    (fingerprint : Fingerprint.Value g → Option String := renderers.fingerprint) : Array Identity :=
-  allocateSiblingIdentities parentSemanticKey debugParent "block" "block"
-    (blocks.map (fun block => blockIdentityHints renderers block fingerprint))
-
-private def partIdentities (renderers : Renderers g)
-    (parentSemanticKey debugParent : String)
-    (parts : Array (_root_.Verso.Doc.Part g))
-    (fingerprint : Fingerprint.Value g → Option String := renderers.fingerprint) : Array Identity :=
-  allocateSiblingIdentities parentSemanticKey debugParent "part" "part"
-    (parts.map (fun part => partIdentityHints part fingerprint))
-
-private partial def appendFingerprintValues (renderers : Renderers g)
-    (values : Array (Fingerprint.Value g)) (block : Doc.Block g) : Array (Fingerprint.Value g) := Id.run do
-  let values := match blockIdentitySource renderers block with
-    | .inl _ => values
-    | .inr value => values.push (.inl value)
-  match block with
-  | .para _ | .code _ => return values
-  | .concat blocks | .blockquote blocks | .other _ blocks =>
-    return blocks.foldl (appendFingerprintValues renderers) values
-  | .ul items | .ol _ items =>
-    return items.foldl (fun values item => item.contents.foldl (appendFingerprintValues renderers) values) values
-  | .dl items =>
-    return items.foldl (fun values item => item.desc.foldl (appendFingerprintValues renderers) values) values
-
-private partial def partFingerprintValues (renderers : Renderers g)
-    (values : Array (Fingerprint.Value g)) (part : Doc.Part g) : Array (Fingerprint.Value g) :=
-  let values := part.content.foldl (appendFingerprintValues renderers) (values.push (.inr part.title))
-  part.subParts.foldl (partFingerprintValues renderers) values
-
-/-- Advance one mounted preview's content identities. Explicit labels retain
-their existing policy. Preparation visits document blocks but never renders
-extension children or invokes JavaScript. Retain the result in React state. -/
-def prepareIdentities [BEq g.Inline] [BEq g.Block] [Hashable g.Inline] [Hashable g.Block] (previous : Fingerprint.State g) (document : Doc.Part g)
-    (renderers : Renderers g := {}) : Fingerprint.State g :=
-  previous.advance (partFingerprintValues renderers #[] document)
-
-private def rootIdentity : Identity := {
-  reactKey := "structural:root"
-  debugPath := RenderPath.root
-  semanticKey := "root"
-  friendlyId := "root"
-  origin := .structural
-}
-
-private def headingIdentity (part : Identity) : Identity := {
-  reactKey := "structural:heading"
-  debugPath := RenderPath.heading part.debugPath
-  semanticKey := semanticChild part.semanticKey "heading" ""
-  friendlyId := s!"{part.friendlyId}/heading"
-  origin := .structural
-}
-
-private inductive SnapshotValue (g : Doc.Genre) where
-  | heading (content : Array (_root_.Verso.Doc.Inline g))
-  | block (content : _root_.Verso.Doc.Block g)
-
-private instance [BEq g.Inline] [BEq g.Block] : BEq (SnapshotValue g) where
-  beq
-    | .heading left, .heading right => left == right
-    | .block left, .block right => left == right
-    | _, _ => false
-
-private structure Snapshot (g : Doc.Genre) where
-  debugPath : String
-  semanticKey : String
-  value : SnapshotValue g
-
-private partial def appendBlockSnapshots (renderers : Renderers g)
-    (snapshots : Array (Snapshot g))
-    (identity : Identity) : _root_.Verso.Doc.Block g → Array (Snapshot g)
-  | .concat content =>
-      appendChildBlockSnapshots renderers snapshots identity.semanticKey identity.debugPath content
-  | block@(.other _ content) =>
-      let snapshots := snapshots.push {
-        debugPath := identity.debugPath
-        semanticKey := identity.semanticKey
-        value := .block block
-      }
-      appendChildBlockSnapshots renderers snapshots identity.semanticKey identity.debugPath content
-  | block => snapshots.push {
-      debugPath := identity.debugPath
-      semanticKey := identity.semanticKey
-      value := .block block
-    }
-where
-  appendChildBlockSnapshots (renderers : Renderers g)
-      (snapshots : Array (Snapshot g))
-      (parentSemanticKey debugParent : String)
-      (content : Array (_root_.Verso.Doc.Block g)) : Array (Snapshot g) := Id.run do
-    let identities := blockIdentities renderers parentSemanticKey debugParent content
-    let mut snapshots := snapshots
-    for index in [:content.size] do
-      snapshots := appendBlockSnapshots renderers snapshots identities[index]! content[index]!
-    return snapshots
-
-private partial def appendSnapshots (renderers : Renderers g)
-    (snapshots : Array (Snapshot g))
-    (identity : Identity)
-    (part : _root_.Verso.Doc.Part g) : Array (Snapshot g) := Id.run do
-  let heading := headingIdentity identity
-  let mut snapshots := snapshots.push {
-    debugPath := heading.debugPath
-    semanticKey := heading.semanticKey
-    value := .heading part.title
-  }
-  let blocks := blockIdentities renderers identity.semanticKey identity.debugPath part.content
-  for index in [:part.content.size] do
-    snapshots := appendBlockSnapshots renderers snapshots blocks[index]! part.content[index]!
-  let subParts := partIdentities renderers identity.semanticKey identity.debugPath part.subParts
-  for index in [:part.subParts.size] do
-    snapshots := appendSnapshots renderers snapshots subParts[index]! part.subParts[index]!
-  return snapshots
-
-private def snapshots (renderers : Renderers g) (document : Doc.Part g) : Array (Snapshot g) :=
-  appendSnapshots renderers #[] rootIdentity document
-
-/--
-Renderer paths changed relative to the optional previous document, together
-with the current comparison-snapshot count, not a DOM/visible-node count.
-Headings and ordinary blocks are snapshots; lists and quotes are compared as
-whole blocks. Concatenations have no snapshot of their own. Extension blocks
-and their stored children are visited without invoking rendering callbacks,
-including hidden content. Only current-document paths are returned.
-The current snapshot tree is collected once for both results. Comparisons use
-the stateless `renderers.fingerprint` policy, not a current-only prepared state.
--/
-def changedBlockIdsAndCount [BEq g.Inline] [BEq g.Block]
-    (previous : Option (Doc.Part g))
-    (current : Doc.Part g)
-    (renderers : Renderers g := {}) : Array String × Nat :=
-  let currentSnapshots := snapshots renderers current
-  let changedIds :=
-    match previous with
-    | none => currentSnapshots.map (·.debugPath)
-    | some previous =>
-        let previousByKey := snapshots renderers previous |>.foldl
-          (init := ({} : Std.HashMap String (SnapshotValue g))) fun entries snapshot =>
-            entries.insert snapshot.semanticKey snapshot.value
-        currentSnapshots.filterMap fun snapshot =>
-          match previousByKey.get? snapshot.semanticKey with
-          | some prior => if prior == snapshot.value then none else some snapshot.debugPath
-          | none => some snapshot.debugPath
-  (changedIds, currentSnapshots.size)
-
-/-- Initial comparison paths, including stored extension children irrespective
-of rendering visibility. No equality/hash/JSON instances are required. -/
-def renderBlockIds (document : Doc.Part g)
-    (renderers : Renderers g := {}) : Array String :=
-  (snapshots renderers document).map (·.debugPath)
-
-/-- Renderer paths whose semantic nodes are new or changed in `current`. -/
-def changedBlockIds [BEq g.Inline] [BEq g.Block] (previous current : Doc.Part g)
-    (renderers : Renderers g := {}) : Array String :=
-  (changedBlockIdsAndCount (some previous) current renderers).1
 
 private def blockProps
     (styles : Styles)
@@ -643,31 +381,5 @@ def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})
     Js.Object.set props styles.strings.keys.dataVersoChangedBlockCount (← JsValue.ofString (toString options.changedIds.size))
     Js.Object.set props styles.strings.keys.dataVersoFocusBlock (← JsValue.ofString (options.focus.getD ""))
   return ← <article @props={props}>{pure rootPart}</article>
-
-#guard
-  let explicit := ({
-    explicitId? := some "author"
-    fingerprint? := some "content"
-  } : IdentityHints).resolve "block" 0 "part-root-block-0"
-  let fingerprint := ({ fingerprint? := some "content" } : IdentityHints).resolve
-    "block" 0 "part-root-block-0"
-  let positional := ({} : IdentityHints).resolve "block" 0 "part-root-block-0"
-  explicit.origin == .explicit && explicit.reactKey == "explicit:author" &&
-  fingerprint.origin == .fingerprint && positional.origin == .positional
-
-#guard
-  let duplicate := ({ fingerprint? := some "same" } : IdentityHints)
-  let identities := allocateSiblingIdentities "root" "part-root" "block" "block"
-    #[duplicate, duplicate]
-  identities[0]!.reactKey != identities[1]!.reactKey &&
-  identities[0]!.friendlyId != identities[1]!.friendlyId
-
-#guard
-  let before := allocateSiblingIdentities "same-parent" "part-root-block-0" "block" "block" #[{}, {}]
-  let moved := allocateSiblingIdentities "same-parent" "part-root-block-1" "block" "block" #[{}, {}]
-  before[0]!.reactKey == moved[0]!.reactKey &&
-  before[0]!.semanticKey == moved[0]!.semanticKey &&
-  before[0]!.debugPath != moved[0]!.debugPath &&
-  before[0]!.reactKey != before[1]!.reactKey
 
 end VersoCast.Renderer

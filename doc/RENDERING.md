@@ -16,6 +16,11 @@ result in its render callback. Styles are read-only native JavaScript objects;
 the renderer constructs fresh node attributes. It returns a React subtree, not
 a root, state store, widget, editor protocol or asset publisher.
 
+Native styles, attributes and component handles belong to the VIR runtime that
+created them. Do not share them across runtimes or reuse them after disposal.
+For live rendering, the client unmounts its React tree before disposing that
+runtime; Cast has no separate mount/update/dispose protocol.
+
 ## Genre extensions
 
 `Renderer.Renderers genre` supplies optional inline/block and part-metadata
@@ -104,23 +109,6 @@ This policy serializes content and remounts a container when that content change
 It is not the default for interactive previews. Positional fallback preserves
 state through body edits at the same position, but not arbitrary insertion or
 reordering; provide stable semantic keys for stateful authored extensions.
-For readable built-in Lean blocks and compiler output, call
-`Manual.createRenderers styles` once in the component factory and pass the
-result to `Renderer.render`. It preserves source text, message severity,
-summary flags and trace-expansion settings. Native token styles also cover
-inline Lean/names, tactic snippets and Markdown Lean; docstring sections and
-constructor/internal/field signatures render their stored children. Tables keep
-headers and alignment; file examples label their stored input/output contents.
-Paragraph groups retain block structure. Syntax errors show their
-source and diagnostics. Styles are cached in the factory and use VS Code CSS
-variables with browser fallbacks; token colours approximate semantic categories,
-not the editor's full TextMate theme. Interactive hover information is pending.
-Glossary terms render without inventing unresolved cross-reference links.
-Malformed data and unknown
-extensions keep the named fallback. Reference-manual-specific extensions
-(`Manual.example`, `Manual.proofState`) are implemented by the validation
-consumer, not registered globally in Cast.
-The core `VersoCast` import does not import Manual.
 
 Semantic block labels are opaque strings; separators and Unicode are allowed.
 Internal comparison paths encode their components unambiguously. These paths
@@ -145,6 +133,25 @@ block extension.
 
 Ordered lists preserve their signed `start` value, including negative values
 and zero.
+
+## Manual documents
+
+Import `VersoCast.Manual` for readable built-in Lean blocks and compiler output.
+Call `Manual.createRenderers styles` once in the component factory and pass the
+result to `Renderer.render`. It preserves source text, message severity,
+summary flags and trace-expansion settings. Native token styles also cover
+inline Lean/names, tactic snippets and Markdown Lean; docstring sections and
+constructor/internal/field signatures render their stored children. Tables keep
+headers and alignment; file examples label their stored input/output contents.
+Paragraph groups retain block structure. Syntax errors show their
+source and diagnostics. Styles are cached in the factory and use VS Code CSS
+variables with browser fallbacks; token colours approximate semantic categories,
+not the editor's full TextMate theme. Interactive hover information is pending.
+Glossary terms render without inventing unresolved cross-reference links.
+Malformed data and unknown extensions keep the named fallback.
+Reference-manual-specific extensions (`Manual.example`, `Manual.proofState`)
+are implemented by the validation consumer, not registered globally in Cast.
+The core `VersoCast` import does not import Manual.
 
 ## Blog pages and posts
 
