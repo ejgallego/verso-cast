@@ -34,6 +34,8 @@ jobs:
         run: |
           lake build
           lake exe consumer
+      - name: Check clean Git package consumers
+        run: node tests/git-consumer.mjs
       - name: Install locked browser test dependencies
         run: |
           npm ci

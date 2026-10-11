@@ -25,6 +25,20 @@ Run these sequentially: the local-path consumer and root project share Cast's
 build directory. CI uses this sequence on Ubuntu 24.04, installs Chromium's
 system dependencies and disables restored build caches and Lake's artifact cache.
 
+To check package consumption without local build outputs or dependency overrides:
+
+```sh
+node tests/git-consumer.mjs
+```
+
+This needs only Node's standard library, Git and the installed Lean toolchain;
+it can run before `npm ci`. It tests committed `HEAD`, not working-tree edits.
+Two temporary consumers fetch that revision through Lake Git dependencies: core
+and the optional Slides subdirectory. They reuse the public-API fixtures, verify
+the inherited pins and Slides' same-checkout core, and run the native identity
+example. Artifact caching is disabled, and temporary checkouts/builds are removed
+on success or failure. CI runs this gate before the browser setup.
+
 ## Test coverage
 
 Each npm test below can be run with `npm run <name>`.
@@ -34,6 +48,7 @@ Each npm test below can be run with `npm run <name>`.
 | `lake test` | Typed identities, hash collisions, retirement and change-comparison policy |
 | Consumer `lake build` | Public root import, generic extension hooks, headings and attributes |
 | Consumer `lake exe consumer` | Native execution of pure identity helpers |
+| `test:git-consumer` | Fresh Git root/subdirectory consumers, pinned dependencies and public APIs |
 | `test:renderer` | React nodes, escaping, fallback extensions, keys and change markers |
 | `test:offline` | Verso/SSR/live comparison, lazy extension dispatch and metadata hooks |
 | `test:identity` | State and DOM retention across insertion, reordering, edits and removal |

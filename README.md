@@ -13,6 +13,13 @@ pinned in `lakefile.lean` and `lake-manifest.json`.
 lake build
 ```
 
+For a downstream project, pin a published Cast commit in its lakefile and use
+the matching Lean toolchain:
+
+```lean
+require «verso-cast» from git "https://github.com/ejgallego/verso-cast" @ "<cast-commit>"
+```
+
 ```lean
 import VersoCast
 

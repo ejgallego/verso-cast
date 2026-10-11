@@ -179,8 +179,16 @@ require «verso-cast-slides» from "/path/to/verso-cast/packages/slides"
 ```
 
 For Git consumption, select the repository's `packages/slides` subdirectory at
-the Cast revision you pin. The package pins its Slides dependency and uses the
-same-checkout Cast core; keep the consumer on the matching Lean toolchain.
+the published Cast revision you pin:
+
+```lean
+require «verso-cast-slides» from git "https://github.com/ejgallego/verso-cast" @
+  "<cast-commit>" / "packages/slides"
+```
+
+The package pins its Slides dependency and uses the same-checkout Cast core;
+no separate core dependency is needed. Keep the consumer on the matching Lean
+toolchain.
 
 ```lean
 import VersoCastSlides
