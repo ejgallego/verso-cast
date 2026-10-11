@@ -149,8 +149,9 @@ variables with browser fallbacks; token colours approximate semantic categories,
 not the editor's full TextMate theme. Interactive hover information is pending.
 Glossary terms render without inventing unresolved cross-reference links.
 Malformed data and unknown extensions keep the named fallback.
-Reference-manual-specific extensions (`Manual.example`, `Manual.proofState`)
-are implemented by the validation consumer, not registered globally in Cast.
+Reference-manual-specific extensions (examples, proof states, attributes,
+syntax-kind labels and TODO notes) are implemented by the validation consumer,
+not registered globally in Cast.
 The core `VersoCast` import does not import Manual.
 
 ## Blog pages and posts

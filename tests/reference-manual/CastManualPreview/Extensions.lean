@@ -31,6 +31,7 @@ private def exampleIdentity? (ext : Verso.Genre.Manual.Block) : Option String :=
 def create (styles : VersoCast.Renderer.Styles) : ReactM
     (VersoCast.Renderer.Renderers Verso.Genre.Manual) := do
   let base ← VersoCast.Manual.createRenderers styles
+  let highlighting ← VersoCast.Highlighting.Styles.create
   let calloutStyle ← js%{ "border" := (← js#"1px solid var(--vscode-panel-border, #d0d7de)"),
     "borderRadius" := (← js#"5px"), "padding" := (← js#"8px 10px") }
   let summaryStyle ← js%{ "fontWeight" := (← js#"600"), "cursor" := (← js#"pointer") }
@@ -51,9 +52,28 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
         let .ok word := ext.data.getStr? | return none
         return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
           {ProofWidgets.Html.text word}</code>)
+      else if ext.name == `Manual.attr || ext.name == `Manual.attrs then
+        let .ok (value : SubVerso.Highlighting.Highlighted) := Lean.fromJson? ext.data | return none
+        return some (← <code key={← JsValue.ofString key} style={highlighting.inlineCode}>
+          {VersoCast.Highlighting.render highlighting value}</code>)
+      else if ext.name == `Manual.syntaxKind then
+        let .ok ((_kind, label, _doc) : Lean.Name × String × Option String) :=
+          Lean.fromJson? ext.data | return none
+        -- Preserve the authored label; no unresolved links or hover protocol.
+        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text label}</code>)
+      else if ext.name == `Manual.TODO then
+        if ext.data != .null then return none
+        return some (← <span key={← JsValue.ofString key} style={highlighting.warning}>
+          <strong>TODO: </strong>{Js.Array.ofArray (← children ())}</span>)
       else base.renderInline? key ext children
     renderBlock? := fun key attributes ext children => do
-      if ext.name == `Manual.proofState then
+      if ext.name == `Manual.TODO then
+        if ext.data != .null then return none
+        let props ← attributes "todo" highlighting.warning
+        return some (← <aside @props={props}><strong>TODO: </strong>
+          {Js.Array.ofArray (← children.render ())}</aside>)
+      else if ext.name == `Manual.proofState then
         let .ok ((_, goals) : Option String × Array
             (SubVerso.Highlighting.Highlighted.Goal SubVerso.Highlighting.Highlighted)) :=
           Lean.fromJson? ext.data | return none

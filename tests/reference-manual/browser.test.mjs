@@ -9,13 +9,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { stageProgram, serveDemo } from "../../tools/demo.mjs";
 import { openTestRuntime } from "../runtime.mjs";
 import { pages } from "./pages.mjs";
+import { checkManualExtensions } from "./extension-assertions.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const manual = resolve(root, ".local/reference-manual");
-const newSupported = ["Verso.Genre.Manual.Block.table", "Verso.Genre.Manual.Block.paragraph",
+const handledExtensions = ["Verso.Genre.Manual.Block.table", "Verso.Genre.Manual.Block.paragraph",
   "Verso.Genre.Manual.Block.internalSignature", "Verso.Genre.Manual.Block.fieldSignature",
   "Verso.Genre.Manual.InlineLean.Block.exampleFile", "Verso.Genre.Manual.InlineLean.Block.exampleLeanFile",
-  "Manual.example", "Manual.syntax", "Manual.grammar", "Manual.keyword", "Manual.figure"];
+  "Manual.example", "Manual.syntax", "Manual.grammar", "Manual.keyword", "Manual.figure",
+  "Manual.attr", "Manual.attrs", "Manual.syntaxKind", "Manual.TODO"];
 const run = args => execFileSync("lake", args, { cwd: manual, stdio: "inherit" });
 run(["build", "CastManualPreview", ...pages.map(page => `+${page.module}:olean`)]);
 run(["env", "lean", "--run", "cast-preview/ExportPages.lean"]);
@@ -30,7 +32,7 @@ await mkdir(resolve(output, "static/screenshots"), { recursive: true });
 for (const name of ["do-return-hl-1.png", "do-return-hl-2.png"])
   await copyFile(resolve(manual, "static/screenshots", name), resolve(output, "static/screenshots", name));
 const { runtime } = await openTestRuntime("+CastManualPreview:vir", { cwd: manual });
-const staticPages = [], inventory = [];
+const staticPages = [], inventory = [], documents = [];
 try {
   for (const { name, module } of pages) {
     const input = await readFile(resolve(output, `${name}.json`), "utf8");
@@ -44,9 +46,12 @@ try {
       if (name) extensions[name] = (extensions[name] ?? 0) + 1;
       Object.values(value).forEach(child => Array.isArray(child) ? child.forEach(visit) : visit(child));
     };
-    visit(JSON.parse(input));
+    const document = JSON.parse(input);
+    documents.push(document);
+    visit(document);
     inventory.push({ module, extensions });
   }
+  checkManualExtensions(runtime, documents);
 } finally { runtime.dispose(); }
 const html = (await readFile(resolve(root, "examples/browser/index.html"), "utf8"))
   .replace('<div id="app">', '<label>Sample page <select id="sample"></select></label><div id="app">')
@@ -171,7 +176,7 @@ try {
     });
     assert.deepEqual(comparison.live, comparison.ssr, `${sample.module}: live/SSR without parser repair`);
     inventory[index].fallbacks = comparison.fallbacks;
-    for (const name of newSupported)
+    for (const name of handledExtensions)
       assert.equal(comparison.fallbacks.some(text => text === `[block extension: ${name}]` ||
         text === `[inline extension: ${name}]`), false, `${sample.module}: handled ${name}`);
     if (sample.name === "products") {

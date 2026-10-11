@@ -220,6 +220,10 @@ and collapsible examples. Example and syntax summaries preserve stored rich
 inlines; grammar displays its stored text without interactive grammar links.
 Figures preserve rich captions. The browser harness stages the two pinned
 screenshots; VS Code asset-URL mapping is not implemented yet.
+Consumer-owned attribute roles reuse Cast's typed highlighting; syntax-kind
+roles preserve authored labels without unresolved links. Inline/block TODO notes
+keep their rich children visible in this raw preview, irrespective of publication
+draft filtering. Malformed role data keeps the named fallback and source children.
 Interactive hover information is not implemented. The adapter
 colours stored Lean tokens with cached native styles, formats inline Lean and
 glossary terms, and displays docstring containers, field signatures, labeled
@@ -246,9 +250,9 @@ pane. The ordinary three-way comparison additionally covers nested rich
 summaries and tables against `Output.Html.asString`; Verso layout differences
 remain illustrative, not a universal equality constraint.
 
-Remaining fallbacks in this sample include references/citations, generated
-license/index data and consumer roles such as TODO and attributes. They remain
-visible; this validation does not claim whole-manual extension coverage.
+Remaining fallbacks in this sample include references/citations and generated
+license/index data. They remain visible; this validation does not claim
+whole-manual extension coverage.
 
 The widget's sticky header contains an off-by-default Debug checkbox and its
 inspection explanation, outside the rendered article. It enables renderer
