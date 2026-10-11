@@ -19,6 +19,7 @@
     "test:manual": "node tests/manual-acceptance.mjs",
     "test:showcase": "node tests/showcase-browser.mjs",
     "test:reference-setup": "node --test tests/reference-manual/setup.test.mjs",
+    "test:reference-manual": "node tools/setup-reference-manual.mjs && node tests/reference-manual/browser.test.mjs",
     "test:renderer": "node tests/render-acceptance.mjs",
     "test:widget": "node tests/widget-browser.mjs",
     "test:identity": "node tests/identity-browser.mjs",

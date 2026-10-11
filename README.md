@@ -60,7 +60,7 @@ npm nor KaTeX. [Math API and demo](doc/RENDERING.md#optional-math-leaf).
 ## Demos and tests
 
 ```sh
-lake build VersoCast VersoCastTests cast-assets cast-standard-html
+lake build VersoCast VersoCastTests cast-assets cast-standard-html cast-blog-html
 lake test
 npm ci
 npx playwright install chromium

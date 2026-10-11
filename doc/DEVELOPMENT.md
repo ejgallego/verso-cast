@@ -58,6 +58,7 @@ Each npm test below can be run with `npm run <name>`.
 | `test:manual` | Styled source/output, inline Lean, docstring sections, escaping, fallback and default-off debug metadata |
 | `test:blog` | Real Post source, typed Blog extensions, metadata, live/SSR/Verso essentials and disposal |
 | `test:slides` | Optional pinned Slides consumer, notes/fragments, nested root decoration, tables and retained navigation state |
+| `test:reference-manual` | Pinned six-page Manual widget replay, consumer roles, live/SSR agreement and retained controls |
 
 Browser tests use real React and Chromium through Playwright. They test widget
 components, not the VS Code infoview itself. They are correctness tests, not
@@ -192,10 +193,17 @@ After the normal setup above, prepare an isolated, shallow copy of
 `leanprover/reference-manual` at `349244b4dd2f284728c1dacb621cc74a32f9929b`:
 
 ```sh
-node tools/setup-reference-manual.mjs --build
+npm run test:reference-manual
 code --new-window .local/reference-manual --goto .local/reference-manual/Manual/Intro.lean:35
-node tests/reference-manual/browser.test.mjs
 ```
+
+The test command prepares/refreshes the pinned copy before building and replaying
+it. CI runs it sequentially after the root and Slides suites; unlike the setup
+helper's unit tests, it exercises the actual compiled widget and six checked
+documents in Chromium. It requires network access for the pinned manual source
+on first setup, but not a local editor. Existing page edits remain untouched.
+For editor-only setup without the browser replay, use
+`node tools/setup-reference-manual.mjs --build`.
 
 The script checks the exact toolchain and shared dependency revisions, reuses
 Cast's built dependencies, and adds the test widget before `#doc` in 205 pages.
