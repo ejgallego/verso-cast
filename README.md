@@ -1,105 +1,81 @@
 # Verso Cast
 
-Render `Verso.Doc.Part genre` as native React nodes through VIR, with client-owned
-inline, block and section extensions. The same renderer supports live React and
-offline HTML through React SSR.
+Cast displays [Verso](https://github.com/leanprover/verso) documents in React.
+The renderer is written in Lean and runs through
+[VIR](https://github.com/ejgallego/lean-vir). Use it to embed a document in an
+interactive interface, such as a Lean infoview widget, or produce HTML through
+React server rendering.
 
-Experimental. Requires Lean **4.35.0-rc4**; exact Verso and VIR revisions are
-pinned in `lakefile.lean` and `lake-manifest.json`.
+Cast works with any Verso genre. You can supply React renderers for your own
+roles, directives and section metadata. Adapters are included for Manual and
+Blog documents, with a separate optional package for Slides.
 
-## Build and use
+This is an experimental library, using Lean **4.35.0-rc4**.
+
+## Try it
+
+With Lean installed through elan and Node 24 available:
 
 ```sh
+git clone https://github.com/ejgallego/verso-cast.git
+cd verso-cast
 lake build
-```
-
-For a downstream project, pin a published Cast commit in its lakefile and use
-the matching Lean toolchain:
-
-```lean
-require «verso-cast» from git "https://github.com/ejgallego/verso-cast" @ "<cast-commit>"
-```
-
-```lean
-import VersoCast
-
-def renderDocument (styles : VersoCast.Renderer.Styles)
-    {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=
-  VersoCast.Renderer.render styles document
-```
-
-Create `Renderer.Styles.create` once in the component factory. Styles are
-read-only native values; each render constructs fresh props. Basic rendering
-needs no JSON, equality or hashing instances. Supply `Renderer.Renderers genre`
-for inline/block/metadata extensions. The opt-in Manual adapter is available
-through `import VersoCast.Manual`; `import VersoCast.Blog` supports raw Page/Post
-documents. The optional [Slides package](packages/slides/lakefile.lean) exposes
-`import VersoCastSlides` and `VersoCast.Slides.createRenderers`; it does not add
-a Slides dependency to the core package.
-
-The renderer returns a subtree. Stateful extensions use stable ordinary React
-components; extension callbacks themselves are not hook scopes. See the
-[rendering guide](doc/RENDERING.md) for lazy children, identities, attributes,
-focus and change highlighting.
-
-## Optional math
-
-```js
-import katex from "katex";
-import "katex/dist/katex.css";
-import { createMathComponent } from "verso-cast/katex";
-
-const MathFormula = createMathComponent(katex); // once, outside render
-```
-
-Pass it as `Renderer.Renderers.mathComponent?` on the Lean side. Clients supply
-KaTeX, CSS/fonts and any formula preparation. The core Lean build needs neither
-npm nor KaTeX. [Math API and demo](doc/RENDERING.md#optional-math-leaf).
-
-## Demos and tests
-
-```sh
-lake build VersoCast VersoCastTests cast-assets cast-standard-html cast-blog-html
-lake test
 npm ci
-npx playwright install chromium
 lake build VersoCastExamples
-npm test
 npm run demo
 ```
 
-`demo` prints a local URL. For VS Code, open
-[VersoCastShowcase.lean](examples/VersoCastShowcase.lean) and place the cursor
-inside `showcase_ready`. The [development guide](doc/DEVELOPMENT.md) covers
-runtime assets, individual tests and the three-way HTML comparison.
+Open the printed URL to try a small document with a React checkbox. No browser
+test installation is needed. To see the custom-genre showcase in VS Code instead:
 
-## Source map
+```sh
+lake exe cast-assets
+code examples/VersoCastShowcase.lean
+```
 
-| Location | Responsibility |
-| --- | --- |
-| `VersoCast/Renderer.lean` | Document-to-React traversal and native props |
-| `VersoCast/Renderer/Changes.lean` | Pure identity preparation and change comparison |
-| `VersoCast/Renderer/Identity.lean` | Internal sibling identity allocation, not root-exported |
-| `VersoCast/Renderer/Config.lean` | Extension hooks, attributes and render options |
-| `VersoCast/Renderer/Style.lean` | Factory-owned native styles |
-| `VersoCast/Fingerprint.lean` | Optional retained identity state |
-| `VersoCast/RenderPath.lean` | Navigation addresses |
-| `VersoCast/JsStrings.lean` | Cached native strings |
-| `VersoCast/Manual.lean` | Manual adapter |
-| `VersoCast/Blog.lean` | Shared Page/Post adapter |
-| `VersoCast/Highlighting.lean` | Shared stored Lean-token presentation |
-| `packages/slides/` | Optional Slides genre adapter, without navigation/widget ownership |
-| `js/katex.mjs` | Optional math leaf |
-| `examples/`, `tests/`, `tools/` | Demos, tests and development tooling |
+Place the cursor inside `showcase_ready`. The widget shows an inline badge,
+a callout directive and custom section headings. See the
+[development guide](doc/DEVELOPMENT.md#demos) for the HTML comparisons,
+math demo and Lean reference-manual preview.
 
-## Scope
+## Use Cast in a project
 
-Clients prepare documents, resolve genre-specific references and numbering, and
-provide their editor or widget integration. Cast does not elaborate documents
-or run Verso traversal.
+Use the same Lean toolchain and pin a Cast commit in your lakefile:
 
-Renderer execution, including SSR, uses VIR. Native Lean C precompilation of
-the renderer is unsupported at the pinned VIR revision.
+```lean
+require «verso-cast» from git
+  "https://github.com/ejgallego/verso-cast" @ "<cast-commit>"
+```
 
-[Attribution and license](ORIGIN.md).
+Given an existing Verso document, this creates a React component that displays it:
+
+```lean
+import VersoCast
+open VersoCast Lean.Vir Lean.Vir.React
+
+def createView {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre) :
+    RuntimeM (FunctionComponent Props) := do
+  let styles ← Renderer.Styles.create
+  FunctionComponent.ofLean fun _ => Renderer.render styles document
+```
+
+The styles are created once and reused when React renders the component.
+The [showcase source](examples/VersoCastShowcase.lean) shows how to add extension
+renderers and register the component as a widget. The
+[rendering guide](doc/RENDERING.md) covers the API, genre adapters, math,
+and retaining state across document edits.
+
+## What Cast provides
+
+Cast renders the document you give it; your application owns document
+preparation, reference resolution, assets and the surrounding interface.
+Unsupported extensions remain visible with their children. This is not a
+replacement for Verso's website generation or a Reveal.js presenter.
+
+The same rendering callbacks work in live React and React server rendering.
+An optional KaTeX component typesets math; without it, math source stays visible.
+Renderer execution requires VIR; native Lean C execution is not supported.
+
+For contributing, build instructions and tests, see the
+[development guide](doc/DEVELOPMENT.md). Cast is licensed under Apache-2.0;
+see [attribution](ORIGIN.md) and [LICENSE](LICENSE).

@@ -1,195 +1,157 @@
-# Rendering API
+# Rendering guide
 
-Consumers import `VersoCast`. The main helper is:
+Cast takes a `Verso.Doc.Part genre` and produces a React subtree. The
+[README](../README.md#use-cast-in-a-project) shows a minimal component factory;
+the [showcase](../examples/VersoCastShowcase.lean) adds a widget and React state.
+Your application prepares the document and supplies its surrounding interface,
+assets, resolved references and numbering.
 
-```lean
-import VersoCast
-
-def renderDocument (styles : VersoCast.Renderer.Styles)
-    {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre) :
-    Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=
-  VersoCast.Renderer.render styles document
-```
-
-Create `Renderer.Styles.create` once in the component factory and capture the
-result in its render callback. Styles are read-only native JavaScript objects;
-the renderer constructs fresh node attributes. It returns a React subtree, not
-a root, state store, widget, editor protocol or asset publisher.
-
-Native styles, attributes and component handles belong to the VIR runtime that
-created them. Do not share them across runtimes or reuse them after disposal.
-For live rendering, the client unmounts its React tree before disposing that
-runtime; Cast has no separate mount/update/dispose protocol.
+Create `Renderer.Styles.create` once in the component factory. The styles are
+read-only native objects, reused by rendering callbacks; each node gets fresh
+props. Native styles, attributes and component handles belong to the VIR
+runtime that created them. For live rendering, unmount the React tree before
+disposing that runtime. Do not share its handles with another runtime.
 
 ## Genre extensions
 
-`Renderer.Renderers genre` supplies optional inline/block and part-metadata
-render helpers. Pass it explicitly as `renderers := myRenderers`; no global
-registry is needed. Callbacks receive the genre's own extension values and lazy
-child-rendering callbacks. Returning `none` selects the default output. Unknown
-inline/block extensions remain visible with their original children; part
-metadata defaults to the ordinary section layout. The part hook receives the
-typed part without its own metadata. `renderDefault none` uses the ordinary
-heading; `renderDefault (some header)` customizes numbering, anchors or title
-presentation without copying section traversal. The heading callback receives
-its level (clamped to h6), fresh key/focus/change attributes and title nodes.
-It should return the matching hN element. Descendant metadata is preserved.
-Call each child/default callback at most once and return `some` after using it;
-returning `none` delegates to fallback rendering. No memoization or registry
-scan is added to extension handling.
+Pass a `Renderer.Renderers genre` record to `Renderer.render` to handle your
+genre's inline roles, block directives and section metadata. Here is a simple
+component that displays every inline extension as highlighted text:
 
-Block callbacks receive `Renderer.BlockChildren`: `children.render ()` renders
-ordinary wrapped blocks. `children.splitParagraph? ()` exposes a leading
-paragraph's fresh attributes/inlines and a separate lazy body, useful for rich
-summaries and captions. `children.listItems? ()` exposes cells of a single
-unordered list as lazy fresh attributes/block contents. Shape inspection renders
-nothing; choose one view and consume each selected child at most once. Source
-addresses and sibling keys retain their original positions, even when wrappers
-are omitted. With positional identities, these views prepare children in linear
-time; opt-in fingerprinting retains its own documented cost.
-The genre-independent `Renderer.Table` helper groups those cells, styles headers
-and emits explicit `thead`/`tbody`; malformed dimensions consume no cells.
-`children.renderWith decorate` decorates each visible child root's fresh props
-while constructing it, without inspecting or cloning finished React nodes.
-Concatenations forward the decorator; transparent extension adapters can forward
-it by choosing `renderWith` themselves. Ordinary wrappers receive it only on
-their own root. Nested decorators run inner-first, outer-last. Preserve source
-and identity fields; Cast writes its reserved key/navigation fields afterward.
-Use `Renderer.appendClass` with a cached native suffix (including a leading
-space) to append classes without a Lean/native string round trip per child.
-These helpers are not hook scopes: do not call React hooks inside them.
-Inline extensions must return phrasing content. Cast footnotes use inline
-`span`/`sup` markup rather than invalid `details` inside paragraphs.
-Stateful extensions should return a normal component node with a stable component
-function. Roles/directives already elaborate into Verso nodes; Cast does not
-register or elaborate them again. Resolved references, numbering and other
-traversal-dependent data remain client/genre responsibilities.
-Math defaults to source-preserving output; a caller can supply a stable
-`mathComponent?` leaf. The optional [KaTeX leaf](../js/katex.mjs) is shared by live
-React and offline SSR; the core Lean renderer does not depend on KaTeX.
+```lean
+import VersoCast
+open VersoCast Lean.Vir Lean.Vir.React
+open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
-For typed token output, import `VersoCast.Highlighting`.
-`Highlighting.render styles value key` accepts an optional sibling-local root
-key when composing typed highlighting leaves. It defaults to `"root"` for the
-standalone case; descendant token keys remain local to their own sequence.
+def createMarkedView {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre) :
+    RuntimeM (FunctionComponent Props) := do
+  let styles ← Renderer.Styles.create
+  let handlers : Renderer.Renderers genre := {
+    renderInline? := fun key _ children => do
+      return some (← <mark key={← JsValue.ofString key}>
+        {Js.Array.ofArray (← children ())}</mark>) }
+  FunctionComponent.ofLean fun _ =>
+    Renderer.render styles document (renderers := handlers)
+```
 
-The [standalone showcase](../examples/VersoCastShowcase.lean) is a complete,
-checked client: it defines a genre, creates styles once, supplies all three hooks
-and renders a document with ordinary React checkbox state. Its `renderInline?`
-returns a badge, `renderBlock?` returns a callout using the supplied attributes,
-and `renderPart?` adds heading anchors by delegating to `renderDefault`.
-There is no registration step for these callbacks.
+In an adapter, match the genre's extension values and return `none` for cases
+you do not handle. Cast then displays an extension placeholder with its stored
+children. `inlineName` and `blockName` supply names for those placeholders.
+Invalid extension data can use the same fallback.
 
-| Hook outcome | Children/default callback | Result |
+Callbacks receive lazy children, so a replacement can omit content without
+rendering it first. The essential contract is:
+
+| Action | Children/default callback | Return |
 | --- | --- | --- |
-| Decline | Do not call | `none`, allowing Cast's fallback |
+| Decline | Do not call | `none` |
 | Replace or decorate | Call once if needed | `some node` |
 | Hide | Do not call | `some` keyed empty fragment |
 
-Keep a stateful extension's component function stable by creating it in the
-factory, not during document traversal. Return a node for that component;
-React then owns its hooks and retained state. Live and offline rendering use
-the same callbacks. Content created only by effects is absent from offline HTML.
+Use the supplied sibling-local key on inline replacements. Block callbacks get
+an attribute builder that adds the key, source address and focus/change markers.
+Inline output must be valid phrasing content, such as `span` or `code`.
 
-## Identities and retained state
+Extension callbacks are render helpers, not React hook scopes. For a stateful
+extension, create a stable ordinary component in the factory and return a node
+for it. React owns that component's hooks and state. The same callbacks work
+for live rendering and SSR; content created only by effects is absent from SSR.
 
-Basic rendering requires no JSON, equality or hash instances and uses positional
-keys. `Renderers.blockIdentity?` can supply semantic extension keys, while
-`Renderers.fingerprint` optionally supplies content identities. For Manual,
-import `VersoCast.Manual` and extend `Manual.renderers`; its default names
-unsupported extensions but does not fingerprint document content.
-Author-supplied identities take priority; other blocks use positional keys.
-Stateless serialized-content matching is explicitly opt-in:
+### Sections
 
-```lean
-{ fingerprint? := some (fun value => some (VersoCast.Fingerprint.canonicalKey value)) }
-```
+`renderPart?` receives a part's metadata, the part without its own metadata,
+and a lazy `renderDefault` callback. Descendant metadata is preserved.
+Return `none` to use the ordinary section layout, or delegate to
+`renderDefault none` when decorating it. `renderDefault (some header)` replaces
+the heading without copying section traversal. The header receives rendered
+title nodes, fresh attributes and a level clamped to h6; return the matching
+hN element. Call the default at most once and return `some` after using it.
 
-This policy serializes content and remounts a container when that content changes.
-It is not the default for interactive previews. Positional fallback preserves
-state through body edits at the same position, but not arbitrary insertion or
-reordering; provide stable semantic keys for stateful authored extensions.
+The showcase supplies all three hooks: a badge role, a callout directive and
+heading anchors derived from section metadata.
 
-Semantic block labels are opaque strings; separators and Unicode are allowed.
-Internal comparison paths encode their components unambiguously. These paths
-are not the React keys or positional navigation addresses.
+### Structured block children
 
-For retained documents, keep `Fingerprint.State genre` in component state and
-advance it with `Renderer.prepareIdentities` when document content changes.
-This opt-in path requires equality/hash instances for the genre's extensions.
-Pass `{ fingerprint? := some (fun value => some (identities.key value)) }` as
-render options, using the state prepared for that document and the same
-`blockIdentity?` policy as rendering. Reprepare if either changes. Preparation
-is pure and resolves hash collisions with exact equality. React keys are
-sibling-local; navigation paths are separate.
-Cursor/control changes need not recompute content identities.
+`Renderer.BlockChildren` offers several views of a directive's stored content:
 
-List and description-list item keys are positional. Inserting or reordering
-items may reuse state at a position or remount subtrees; an identified block
-inside an item does not override its ancestor's React identity. A content
-fingerprint that changes a container's key also remounts its subtree. For stable
-state through item reordering, use a client-owned keyed list component in a
-block extension.
+- `render ()` keeps the ordinary block wrappers.
+- `splitParagraph? ()` exposes a leading paragraph's attributes/inlines and a
+  separate lazy body, useful for summaries and captions.
+- `listItems? ()` exposes cells of a single unordered list as lazy attributes
+  and block contents. `Renderer.Table.render` groups them into a table with
+  explicit `thead`/`tbody`; malformed dimensions consume no cells.
+- `renderWith decorate` applies a decorator to fresh props while constructing
+  each visible child root, rather than inspecting finished React nodes.
 
-Ordered lists preserve their signed `start` value, including negative values
-and zero.
+Shape inspection renders nothing. Choose one view and consume each selected
+child at most once. Source addresses and sibling keys preserve their original
+positions when wrappers are omitted. With positional identities, preparing
+these child views is linear in the selected sequence.
+
+Concatenations forward decorators; transparent adapters can forward them by
+using `renderWith`. Ordinary wrappers decorate only their own root. Nested
+decorators run inner-first, outer-last. Preserve source and identity fields;
+Cast writes reserved key/navigation fields afterward. `Renderer.appendClass`
+appends a cached native suffix, including its leading space, without a
+Lean/native string round trip for each child.
 
 ## Manual documents
 
-Import `VersoCast.Manual` for readable built-in Lean blocks and compiler output.
-Call `Manual.createRenderers styles` once in the component factory and pass the
-result to `Renderer.render`. It preserves source text, message severity,
-summary flags and trace-expansion settings. Native token styles also cover
-inline Lean/names, tactic snippets and Markdown Lean; docstring sections and
-constructor/internal/field signatures render their stored children. Tables keep
-headers and alignment; file examples label their stored input/output contents.
-Paragraph groups retain block structure. Syntax errors show their
-source and diagnostics. Styles are cached in the factory and use VS Code CSS
-variables with browser fallbacks; token colours approximate semantic categories,
-not the editor's full TextMate theme. Interactive hover information is pending.
-Glossary terms render without inventing unresolved cross-reference links.
-Malformed data and unknown extensions keep the named fallback.
-Reference-manual-specific extensions (examples, proof states, attributes,
-syntax-kind labels and TODO notes) are implemented by the validation consumer,
-not registered globally in Cast.
-The core `VersoCast` import does not import Manual.
+Import `VersoCast.Manual`, create `Manual.createRenderers styles` in the factory,
+and pass the result as `renderers`. It renders built-in Lean source, compiler
+output, inline Lean, tactic snippets, signatures, docstrings, tables, file
+examples, paragraph groups and syntax-error diagnostics. Output preserves
+message severity, summary flags and trace-expansion settings. Tables retain
+headers and alignment. Glossary terms display without unresolved links.
+
+Styles use VS Code CSS variables with browser fallbacks. Token colours
+approximate semantic categories; interactive hovers are not implemented.
+`Manual.renderers` is a smaller record that supplies extension names only,
+useful when building your own adapter. The core `VersoCast` import does not
+import Manual.
+
+Reference-manual-specific examples, proof states, grammar, attribute roles,
+syntax-kind labels and TODO notes belong to the
+[validation consumer](../tests/reference-manual/CastManualPreview/Extensions.lean).
+They are not part of the generic Manual adapter. See the
+[reference-manual setup](DEVELOPMENT.md#lean-reference-manual-validation) to try it.
+
+For custom code presentation, `VersoCast.Highlighting` renders stored SubVerso
+tokens. Create its styles once and call `Highlighting.render styles value key`.
+The optional root key defaults to `"root"`; supply distinct sibling-local keys
+when composing multiple highlighting leaves.
 
 ## Blog pages and posts
 
-Import `VersoCast.Blog` and call `Blog.createRenderers genre styles` once in the
-factory. It accepts both `Verso.Genre.Blog.Page` and `Verso.Genre.Blog.Post`
-through their `BlogGenre` instances. It handles highlighted Lean, stored compiler
-messages, lexed text, HTML spans/divs and docstring containers. Both Blog and
-Manual share `VersoCast.Highlighting`; highlighting is not Manual-specific.
+Import `VersoCast.Blog` and create `Blog.createRenderers genre styles` in the
+factory. It supports Page and Post through their `BlogGenre` instances, handling
+highlighted Lean, compiler messages, lexed text, HTML spans/divs and docstring
+containers. Blog and Manual share token presentation.
 
-This is a raw-document adapter, not a blog site generator. The client owns
-publication metadata, heading IDs, dates/authors and themes. References, registered
-site components, arbitrary HTML blobs/wrappers/details and docstring sections
-retain named fallbacks. Stored hover data is not interactive, and message summary
-flags do not add expandable UI. No site traversal or script loading is copied.
-The [Post comparison fixture](../tests/VersoCastTests/Blog.lean) illustrates the
-metadata hook and assigns distinct DOM ID prefixes to each document instance.
+The client supplies publication metadata, heading IDs, authors/dates and themes.
+References, registered site components, arbitrary HTML blobs/wrappers/details
+and docstring sections retain named fallbacks. Hover data is not interactive,
+and message summary flags do not add expandable UI. The
+[Post fixture](../tests/VersoCastTests/Blog.lean) shows the metadata hook and
+distinct DOM ID prefixes for multiple document instances.
 
 ## Optional Slides package
 
-Slides support is a separate Lake package in `packages/slides`, not a dependency
-of the core Cast package. For a local checkout, add this to the consumer lakefile:
-
-```lean
-require «verso-cast-slides» from "/path/to/verso-cast/packages/slides"
-```
-
-For Git consumption, select the repository's `packages/slides` subdirectory at
-the published Cast revision you pin:
+Slides support lives in `packages/slides`. Add it at the Cast revision you pin:
 
 ```lean
 require «verso-cast-slides» from git "https://github.com/ejgallego/verso-cast" @
   "<cast-commit>" / "packages/slides"
 ```
 
-The package pins its Slides dependency and uses the same-checkout Cast core;
-no separate core dependency is needed. Keep the consumer on the matching Lean
-toolchain.
+For a local checkout:
+
+```lean
+require «verso-cast-slides» from "/path/to/verso-cast/packages/slides"
+```
+
+The package uses its same-checkout Cast core and pins Verso Slides; no separate
+core dependency is needed. Keep the matching Lean toolchain.
 
 ```lean
 import VersoCastSlides
@@ -203,86 +165,39 @@ def createSlidesView (document : Verso.Doc.Part VersoSlides.Slides) :
     Renderer.render styles document (renderers := handlers)
 ```
 
-The public adapter surface is `VersoCast.Slides.createRenderers styles` and
-`VersoCast.Slides.imageUrl?`. The factory optionally accepts a pure
-`VersoSlides.ImgSrc → Option String` resolver for client-published image URLs;
-the default declines project-relative paths. Decoding/code-tree helpers are
-internal, not re-exported by the package root. Clients can extend the returned
-ordinary `Renderer.Renderers` record (including its math leaf and metadata hook).
+The adapter shows the whole deck with notes and fragments visible. It supports
+class roles/directives, nested decorations, code and compiler output, images,
+and basic column-header tables. Vertical/background metadata is annotated;
+navigation and Reveal.js grouping are left to the client. Arbitrary HTML/CSS,
+diagrams, animations and richer tables remain named fallbacks. Row headers,
+striped tables and separator/custom-padding flags are declined; supported
+tables use Cast's preview styles rather than Reveal.js border styling.
 
-This is an always-visible raw-document preview, not a Reveal.js presenter. It
-does not own navigation, widgets, assets, reference traversal or hover/panel
-protocols. The [development guide](DEVELOPMENT.md#browser-demos) lists the supported
-extensions, fallback policy and real three-way comparison. In particular, stored
-code exports are trusted compiler data, not a hostile-graph transport API.
+Attribute extensions accept strings for `class`, `id`, `title`, `role`, `lang`,
+`dir`, `aria-label`, `aria-hidden`, `aria-labelledby`, `aria-describedby`, and
+lowercase `data-*` names outside Cast's `data-verso-*` namespace. A rejected
+field declines the whole extension, preserving its children. Generic wrappers
+have neutral styles so authored layout classes can take effect.
 
-## Focus and change highlighting
+`createRenderers styles resolveImage` optionally accepts a pure
+`VersoSlides.ImgSrc → Option String` URL mapping. The default `Slides.imageUrl?`
+preserves remote URLs and declines project-relative paths. Empty/unresolved
+URLs keep the fallback; clients publish assets and supply their mapping.
+Image alt text, class and width/height are retained.
 
-`Options.focus` is a source-navigation address, not a React key or DOM ID.
-It adds a visual marker without moving keyboard focus or scrolling. Ordinary
-block/heading and list-item addresses select their matching nodes. A fragment
-has no DOM wrapper, so it marks its visible child roots (through nested
-fragments). A description-item address selects both term and value; the exposed
-`-term` and `-description` addresses select those separately. Hidden, empty or
-missing addresses do not fall back to another node. Focus and change markers
-are independent. Editor selection, cursor tracking and scroll policy remain
-with the client.
-
-Pass a current-document state's key function only in `Options.fingerprint?`.
-The `changedBlockIds*` helpers compare both documents using the stateless
-`Renderers.fingerprint` policy; a state prepared only for the new document may
-not contain the old values. These helpers track raw heading/block contents,
-not part metadata, presentation changes or extension visibility. Preparation
-visits all stored blocks, including hidden content; it does not call render
-callbacks. Neither identity helper is a promise of linear whole-document cost.
-
-Change comparison is deliberately coarse for lists and blockquotes: editing a
-term, list start or nested paragraph marks the whole container. Concatenations
-have no comparison entry; extensions contribute both their own entry and stored
-children, even when a rendering callback hides them. Removed nodes have no
-current path to return. A fingerprint policy that changes an ancestor's identity
-also changes its descendants' identity context.
-`changedBlockIdsAndCount` returns the current **comparison-snapshot count**,
-not visible DOM nodes or changed-node count. The root's
-`data-verso-changed-block-count` is the number of supplied changed paths, also
-not a visibility-aware count. `renderBlockIds` computes initial comparison paths
-without equality/hash/JSON instances. Finer-grained client highlighting can
-supply nested paths directly through `Options.changedIds`; the default helper
-does not introduce another analyzed document or visibility pass.
-
-## Native attributes and ownership
-
-`Renderer.Options.debug` defaults to `false`. Source/navigation addresses,
-node kinds, focus/change markers and visible unsupported-extension output are
-always available. Inspection-only identity labels, generated path tooltips and
-root diagnostic summaries are emitted only with `{ debug := true }`; disabling
-them does not change React keys or run an extra document traversal. Client-owned
-tooltips and explicitly supplied attributes remain under client control.
-
-Extra root/math attributes are immutable `Array Renderer.Attribute` values.
-`Attribute.of nativeKey nativeValue` only widens the native value's phantom type;
-it performs no conversion or host call. Cache the array with styles/components
-in the factory. Each render allocates fresh props and applies defaults, then
-caller attributes, then reserved fields. Caller style/class/id override defaults;
-root diagnostic attributes (when debug is enabled) and math key/mode (plus
-component source) are reserved. Values are borrowed, not deep-copied or mutated.
-No fixed document DOM ID is imposed.
-Attribute application is O(p) in explicitly supplied fields, with one native
-write per field; it never enumerates an opaque native object. The ordinary
-extension dispatch adds O(1) work per visited extension, excluding its renderer,
-child rendering and any opt-in content identity policy. These are structural
-cost claims, not measured latency results.
-
-## Client-owned semantics
-
-Clients supply prepared documents and interpret their own extension data,
-including labels, resolved references, numbering and external markup. Use the
-block hook's attributes and lazy children for custom statements, callouts or
-source/summary views; hiding an extension should skip its children entirely.
-Define malformed-data and unsupported-extension output in the client adapter.
-Cast's fallback is a visible placeholder, not a genre-specific error policy.
+Stored Lean/slide code uses shared token styles. Fragments, click targets,
+tactic ranges, diagnostic severity and panel/stretch requests are annotated,
+but hover/panel/reveal behavior is not implemented. Hidden hover/goal content
+is omitted. Command output is escaped, and non-Lean code preserves its source
+without syntax highlighting. Code decoders operate on checked compiler exports
+per render; malformed data keeps the fallback. Cyclic reference graphs and
+resource limits are not validated, so this is not a hostile-input decoder.
+The returned renderer record can be extended with your math and metadata hooks.
 
 ## Optional math leaf
+
+Without a math component, Cast shows formula source. The optional JS helper
+creates a stable KaTeX component shared by live rendering and SSR:
 
 ```js
 import katex from "katex";
@@ -292,31 +207,101 @@ import { createMathComponent } from "verso-cast/katex";
 const MathFormula = createMathComponent(katex); // once, outside render
 ```
 
-Pass this native React function as `Renderer.Renderers.mathComponent?` on the
-Lean side. It receives `source` and `data-verso-math-mode` from Cast and preserves
-the caller's other attributes. Both browser rendering and React SSR use
-`renderToString`, including accessible MathML; no effect is needed to populate
-the formula. The memoized computation depends only on source and display mode.
-React may recompute it, so correctness does not rely on memoization. Input is
-untrusted (`trust: false`), parse failures remain visible, and each computation
-gets a fresh macro table. Only KaTeX-produced HTML enters the inner-HTML boundary.
-Clients own source preparation (including genre-specific preludes), KaTeX
-version and CSS/font delivery. No Blueprint-specific attribute is interpreted.
+The helper is exported by this repository's npm package, currently not published
+to the registry. A client must make that package available to its JS bundler
+separately from its Lake dependency. The Lean-only build needs neither npm nor
+KaTeX.
 
-The tests pin KaTeX in npm dev dependencies and bundle CSS/fonts for a small
-live/offline comparison. This does not add an npm requirement to `lake build`:
+Pass the native React function as `Renderer.Renderers.mathComponent?`. It
+receives `source`, `data-verso-math-mode` and caller attributes. Clients supply
+KaTeX, CSS/fonts and any genre-specific source preparation, including preludes.
 
-```sh
-npm run test:math -- --serve
+The leaf uses `renderToString` with HTML and accessible MathML during rendering.
+Memoization depends only on source and display mode; correctness does not rely
+on retaining the memo. TeX is untrusted (`trust: false`), parse failures remain
+visible, and every computation gets a fresh macro table. Only KaTeX-produced
+HTML enters the inner-HTML boundary. See the [math demo](DEVELOPMENT.md#demos).
+
+## Identities and retained state
+
+Basic rendering uses positional React keys and needs no JSON, equality or hash
+instances. Body edits at the same position preserve state, but insertion or
+reordering can reuse positional state or remount subtrees. Use
+`Renderers.blockIdentity?` for semantic identities of stateful authored blocks.
+Labels are opaque strings, including separators and Unicode; sibling duplicates
+are disambiguated. React keys are sibling-local and distinct from navigation
+addresses.
+
+Content identities are opt-in. For matching retained document contents, keep
+`Fingerprint.State genre` in React state and advance it using
+`Renderer.prepareIdentities previous document renderers`. This requires equality
+and hashing for the genre's extensions. Pass
+`{ fingerprint? := some (fun value => some (identities.key value)) }` in render
+options, with the state prepared for that document and the same `blockIdentity?`
+policy. Reprepare when either changes, not for cursor/control-only updates.
+Preparation is pure and resolves hash collisions with exact equality.
+
+For stateless serialized-content keys, use:
+
+```lean
+{ fingerprint? := some (fun value => some (VersoCast.Fingerprint.canonicalKey value)) }
 ```
 
-Open the printed URL to edit a formula and toggle display mode. The offline pane
-is the initial formula rendered through the same Lean document path and native
-component; it is intentionally static. Ctrl-C stops the server.
+This serializes content and remounts a container when that content changes, so
+it is usually unsuitable for interactive previews. `Renderers.fingerprint`
+supplies a shared stateless policy for rendering and change comparison;
+`Options.fingerprint?` overrides it for a render, including with prepared state.
+
+List and description-list item keys are positional. An identified block inside
+an item cannot override the ancestor's identity; stable state through item
+reordering needs a client-owned keyed list component. Changing an ancestor's
+content key remounts its subtree. Ordered lists retain their signed `start`,
+including zero and negative values.
+
+## Focus and change highlighting
+
+`Options.focus` marks a source-navigation address. It does not move keyboard
+focus or scroll. Blocks, headings and list items select their matching nodes;
+fragments mark visible child roots. A description-item address marks both term
+and value, while `-term` and `-description` addresses select them separately.
+Hidden, empty or missing addresses do not select a substitute.
+
+`changedBlockIds*` compares raw heading/block contents using the stateless
+`Renderers.fingerprint` policy, not a state prepared only for the current
+document. It excludes part metadata and presentation/visibility changes, visits
+stored children even when hidden, and returns only current-document paths.
+Lists and blockquotes are coarse units; concatenations have no entry of their
+own. Extension blocks and their stored children both contribute entries.
+Neither comparison nor retained content hashing guarantees linear cost over
+the whole document.
+
+`changedBlockIdsAndCount` returns a comparison-snapshot count, not a visible DOM
+count. The root's `data-verso-changed-block-count` counts supplied changed paths.
+`renderBlockIds` returns initial comparison paths without equality/hash/JSON
+instances. For finer highlighting, supply paths directly in `Options.changedIds`.
+Focus and change markers are independent.
+
+## Native attributes and ownership
+
+`Options.debug` defaults to `false`. Source addresses, node kinds, focus/change
+markers and visible fallbacks remain available; debug adds identity labels,
+generated path tooltips and root inspection summaries. It does not change keys
+or run an extra tree traversal. Client-owned tooltips remain under client control.
+
+Root/math attributes are immutable arrays of `Renderer.Attribute` pairs.
+`Attribute.of nativeKey nativeValue` widens only the value's phantom type, without
+conversion or a host call. Cache keys/values with the factory's styles/components.
+Rendering applies defaults, caller attributes and then reserved fields to fresh
+props. Caller style/class/id override defaults; debug summaries and math
+key/mode/source fields are reserved. Values are borrowed, not deep-copied or
+mutated. Cast imposes no fixed document DOM ID.
+
+Applying p supplied attributes takes O(p) native writes. Extension dispatch
+adds O(1) work per visited extension, excluding the callback, its children and
+opt-in identity policy. These describe the algorithm, not measured latency.
 
 ## Execution backends
 
-The React renderer executes through VIR, including for Node SSR. Native Lean C
-precompilation of the renderer is unsupported at the pinned VIR revision:
-its JavaScript host externs cannot be compiled as native C functions.
+Rendering, including Node SSR, executes through VIR. At the pinned revision,
+the renderer's JavaScript host externs cannot run as native Lean C functions.
 The pure `VersoCast.Fingerprint` helpers support native execution.

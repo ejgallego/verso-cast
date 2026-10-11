@@ -1,10 +1,14 @@
 # Development
 
+For library usage and supported rendering behavior, see the
+[rendering guide](RENDERING.md).
+
 ## Setup and tests
 
-Run from the repository root with Node 24. Build the Lean targets before
-`npm ci`: the local VIR npm dependency lives in Lake's pinned checkout.
-Build widget examples after `npm ci`, because VIR's widget bundle uses npm tooling.
+Run from the repository root with Node 24 and the checked-in Lean toolchain.
+Build the Lean targets before `npm ci`, since the local VIR npm dependency
+lives in Lake's pinned checkout. Build widget examples after installing npm
+dependencies.
 
 ```sh
 lake build VersoCast VersoCastTests cast-assets cast-standard-html cast-blog-html
@@ -13,88 +17,66 @@ npm ci
 npx playwright install chromium
 lake build VersoCastExamples
 npm test
+npm run test:js-package
+npm run test:reference-setup
 ```
 
-Check the separate consumer after the root build:
+On Linux, `npx playwright install --with-deps chromium` also installs the system
+libraries needed by the browser tests.
+
+Run the local-path consumer after the root build:
 
 ```sh
 (cd tests/downstream && lake build && lake exe consumer)
 ```
 
-Run these sequentially: the local-path consumer and root project share Cast's
-build directory. CI uses this sequence on Ubuntu 24.04, installs Chromium's
-system dependencies and disables restored build caches and Lake's artifact cache.
-
-To check package consumption without local build outputs or dependency overrides:
+For fresh Git consumers of committed `HEAD`, rather than working-tree edits:
 
 ```sh
-node tests/git-consumer.mjs
+npm run test:git-consumer
 ```
 
-This needs only Node's standard library, Git and the installed Lean toolchain;
-it can run before `npm ci`. It tests committed `HEAD`, not working-tree edits.
-Two temporary consumers fetch that revision through Lake Git dependencies: core
-and the optional Slides subdirectory. They reuse the public-API fixtures, verify
-the inherited pins and Slides' same-checkout core, and run the native identity
-example. Artifact caching is disabled, and temporary checkouts/builds are removed
-on success or failure. CI runs this gate before the browser setup.
+This gate needs only Node, Git and Lean, so it can run before `npm ci`. It checks
+core and Slides-subdirectory consumption, dependency pins and public APIs in
+temporary checkouts. The directories are removed on success or failure.
+The JS package test separately extracts an npm tarball and imports its KaTeX
+helper from an external consumer, reusing installed test dependencies.
+Neither test publishes a package.
 
-## Test coverage
+Build the optional Slides package and its consumer sequentially:
 
-Each npm test below can be run with `npm run <name>`.
+```sh
+(cd packages/slides && lake build)
+(cd tests/slides && lake build CastSlides CastSlides.PublicApi)
+npm run test:slides
+```
+
+The root, local consumers and reference-manual copy share dependency build
+directories: do not build them concurrently. [CI](../.github/workflows/ci.yml)
+runs the suites sequentially on Ubuntu with build caches disabled.
+
+### Choosing a test
+
+Each named test below runs with `npm run <name>`.
 
 | Command | Coverage |
 | --- | --- |
-| `lake test` | Typed identities, hash collisions, retirement and change-comparison policy |
-| Consumer `lake build` | Public root import, generic extension hooks, headings and attributes |
-| Consumer `lake exe consumer` | Native execution of pure identity helpers |
-| `test:git-consumer` | Fresh Git root/subdirectory consumers, pinned dependencies and public APIs |
-| `test:js-package` | Exact npm tarball contents and external KaTeX/React SSR import, using locked test dependencies |
-| `test:renderer` | React nodes, escaping, fallback extensions, keys and change markers |
-| `test:offline` | Verso/SSR/live comparison, lazy extension dispatch and metadata hooks |
-| `test:identity` | State and DOM retention across insertion, reordering, edits and removal |
-| `test:navigation` | Focus addresses, fragments, description lists and independent change markers |
-| `test:widget`, `test:showcase` | Live component state, callbacks, retained DOM and disposal |
-| `test:math` | KaTeX SSR/live output, updates, malformed input and macro isolation |
-| `test:manual` | Styled source/output, inline Lean, docstring sections, escaping, fallback and default-off debug metadata |
-| `test:blog` | Real Post source, typed Blog extensions, metadata, live/SSR/Verso essentials and disposal |
-| `test:slides` | Optional pinned Slides consumer, notes/fragments, nested root decoration, tables and retained navigation state |
-| `test:reference-manual` | Pinned six-page Manual widget replay, consumer roles, live/SSR agreement and retained controls |
+| `lake test` | Identities, hash collisions, retirement and change comparison |
+| Consumer build/executable | Public API boundary and native identity helpers |
+| `test:git-consumer`, `test:js-package` | Lean Git packages and packaged JS helper |
+| `test:renderer`, `test:offline` | Rendered nodes, extension contracts and live/SSR fidelity |
+| `test:identity`, `test:navigation` | Retained state, focus addresses and change markers |
+| `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
+| `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
+| `test:reference-setup` | Reference-manual setup patching |
+| `test:reference-manual` | Six real Manual pages, consumer extensions and widget lifecycle |
 
-Browser tests use real React and Chromium through Playwright. They test widget
-components, not the VS Code infoview itself. They are correctness tests, not
-performance benchmarks.
+Browser tests use real React and Chromium. They check components, not VS Code
+itself, and are correctness tests rather than performance benchmarks.
 
-The optional JavaScript package contains only the math leaf and package/license
-documentation; Lake's Git packages are unaffected. `test:js-package` extracts a
-real npm tarball into a temporary external consumer and uses the installed test
-dependencies without registry access. It does not publish or test npm installation.
+## Demos
 
-The public root re-exports the pure preparation/comparison helpers and React
-renderer. Internal sibling allocation lives in `Renderer/Identity.lean`, shared
-by comparison and traversal through private imports. Its invariants are checked
-in `tests/VersoCastTests/Identity.lean`; the separate consumer also checks that the
-internal type is not exposed by `import VersoCast`.
-
-## VS Code showcase
-
-After setup, prepare the runtime and open the example:
-
-```sh
-lake exe cast-assets
-code examples/VersoCastShowcase.lean
-```
-
-Place the cursor inside `showcase_ready`. The widget demonstrates a custom genre,
-a badge role, a callout directive, section anchors and a checkbox. The smaller
-`examples/VersoCastDemo.lean` uses Manual; place the cursor inside
-`castDemo_and_comm`. These examples display math source; the typeset math demo
-is separate below.
-
-If the infoview needs refreshed assets, restart the Lean server or reopen the
-file after preparing the runtime.
-
-## Browser demos
+After setup, these commands print a local URL. Stop the server with Ctrl-C:
 
 ```sh
 npm run demo
@@ -104,187 +86,104 @@ npm run compare:slides:serve
 npm run test:math -- --serve
 ```
 
-Run one command at a time and open its printed local URL. Stop with Ctrl-C.
-Generated files are written under `_out/`.
+The comparison commands currently run their browser checks before serving,
+so they need Playwright's Chromium installation. The plain `demo` does not.
+Prepare the Slides consumer above before viewing its comparison.
 
-The comparison shows the same [typed document](../tests/VersoCastTests/Fixture.lean)
-through live Cast/React, React SSR and Verso's standard renderer. The latter
-converts `Output.Html` to a string with `asString`. Cast's live and SSR structures
-must agree; cross-backend layout differences are illustrative rather than a
-universal equivalence requirement. This fixture leaves math as source.
-`npm run compare` generates the HTML and observations without serving them.
+The comparisons show one document through live Cast, React SSR and Verso's
+standard HTML renderer. Live/SSR structures must agree; comparisons with Verso
+check fixture content, not identical themes or whole generated sites.
+`npm run compare` generates the core comparison without serving it.
+The math demo has editable source and display mode; its SSR pane shows the
+initial formula. Outputs and screenshots are under `_out/`.
 
-The math demo uses the shared KaTeX leaf for both live and offline output,
-with editable formula source and display mode.
-
-The Blog comparison uses a checked Post with metadata, a JSON lexer, Lean source
-and output. The Slides comparison builds the isolated [test consumer](../tests/slides/lakefile.lean)
-of the optional [Slides package](../packages/slides/lakefile.lean), which pins
-`leanprover/verso-slides` at `268257a4fbdac12c77be726213b51c3ce3a1d41e` with the
-same Lean toolchain and Verso revision as Cast. The implementation lives only in
-that package; tests/demos consume `import VersoCastSlides`. The core Cast dependency
-graph has no Slides dependency. Run these sequentially after the root setup:
+For VS Code, prepare the runtime and open the showcase:
 
 ```sh
-(cd packages/slides && lake build)
-(cd tests/slides && lake build CastSlides CastSlides.PublicApi)
-npm run test:slides
+lake exe cast-assets
+code examples/VersoCastShowcase.lean
 ```
 
-CI runs this sequence after the root suite. Both
-comparisons use actual genre documents, live React, React SSR and the existing
-genre renderer's `Output.Html.asString`. Native reference executables import
-only pure fixtures, not VIR's JavaScript-host-dependent renderer.
-
-Slides preview covers three horizontal sections, a vertical group, notes,
-inline/block fragments, inline class roles, nested class directives, escaped
-non-Lean code, an explicitly published local image and a basic column-header table.
-Notes/fragments remain visible; ordinary React shell buttons select/highlight a
-source heading while retaining the whole deck. Vertical/background metadata is
-annotated, not converted into Reveal.js grouping/navigation. This is not a
-presenter: arbitrary HTML, CSS, diagrams, animations and row-header or striped
-tables remain named fallbacks. Stored Lean/slide code is rendered as described
-below. Tables with separator/custom-padding
-flags are also declined; supported tables use Cast's preview styles rather than
-faithfully matching Reveal.js's border flag. Math remains source. Blog's stored hidden
-hover messages are excluded from the visible-code comparison; Cast does not
-implement those hovers. Cross-backend checks are bounded content observations,
-not a promise of identical themes, wrappers or generated sites.
-
-The optional adapter's single factory is `VersoCast.Slides.createRenderers styles`,
-in [VersoCastSlides.Renderers](../packages/slides/VersoCastSlides/Renderers.lean); the demo
-component separately owns navigation and React state. It currently accepts
-string attributes `class`, `id`, `title`, `role`, `lang`, `dir`, `aria-label`,
-`aria-hidden`, `aria-labelledby`, `aria-describedby`, and lowercase `data-*`
-names (excluding Cast's `data-verso-*` namespace). A rejected field declines the
-whole extension, preserving its children in a named fallback. No HTML style
-parser, event-string evaluator or arbitrary React-prop conversion is supplied.
-Generic wrappers have neutral styles so consumer layout classes can take effect.
-Keys/values and fragment indices are converted once per extension; nested
-decorators apply inner-first, outer-last. The contract checks include React
-reserved props, malformed attribute names, table declines and single child
-consumption. Non-Lean code is source-preserving, not syntax-highlighted.
-
-`createRenderers styles resolveImage` optionally accepts a pure
-`VersoSlides.ImgSrc → Option String` URL mapping. The default preserves remote
-URLs and declines project-relative paths; empty/unresolved URLs keep the named
-fallback and stored children. A browser/VS Code client supplies the mapping and
-asset publishing appropriate to its workspace—Cast does not inspect the
-filesystem or guess a site root. Width/height become fresh native style fields,
-and alt text/class names are preserved. The fixture publishes just `badge.svg`
-into its comparison directory, with an explicit matching map for both backends.
-
-Stored Lean code uses the shared Cast token styles, including inline terms and
-names. The adapter reconstructs SubVerso highlighting or the typed `SlideCode`
-tree using the existing upstream export schema. Fragments keep their style/index;
-click targets remain marked but are not interactive. Tactic ranges and diagnostic
-severity remain annotated; hidden hover/goals DOM is omitted. Command output
-renders escaped severity-styled text, not an interactive trace/goal view. Block
-code fragments and output use block-styled spans so both inline and block code
-remain valid phrasing content. Source text is not duplicated from the extension's
-fallback children after a successful decode.
-
-The decoder currently runs per render, with no transport converter or retained
-cache. It returns `Except` errors for malformed JSON, bad decimal table keys,
-schema errors and missing references; the adapter then keeps the named fallback
-and original children. Inputs are checked compiler exports, not hostile arbitrary
-reference graphs: cyclic graphs/resource limits are not validated here. Panel
-requests and stretch classes are annotated, but no Reveal.js panel/hover/reveal
-runtime is installed. The comparison includes real elaborated Lean code and an
-inline term; synthetic tests cover fragments, clicks, outputs and malformed data.
+Place the cursor inside `showcase_ready`. The smaller
+[Manual demo](../examples/VersoCastDemo.lean) uses `castDemo_and_comm` as its
+cursor anchor. These widgets display math source; the browser math demo typesets
+it. Restart the Lean server or reopen the file after refreshing runtime assets.
 
 ## Lean reference manual validation
 
-After the normal setup above, prepare an isolated, shallow copy of
-`leanprover/reference-manual` at `349244b4dd2f284728c1dacb621cc74a32f9929b`:
+The setup helper creates a pinned copy under `.local/reference-manual`, adds
+the test widget to document pages and shares Cast's checked dependency revisions.
+Its source pin is defined in [the helper](../tools/setup-reference-manual.mjs).
+It preserves page edits and refuses to overwrite edited configuration or helper
+files. First setup needs network access.
+
+For an editor preview:
 
 ```sh
-npm run test:reference-manual
+node tools/setup-reference-manual.mjs --build
 code --new-window .local/reference-manual --goto .local/reference-manual/Manual/Intro.lean:35
 ```
 
-The test command prepares/refreshes the pinned copy before building and replaying
-it. CI runs it sequentially after the root and Slides suites; unlike the setup
-helper's unit tests, it exercises the actual compiled widget and six checked
-documents in Chromium. It requires network access for the pinned manual source
-on first setup, but not a local editor. Existing page edits remain untouched.
-For editor-only setup without the browser replay, use
-`node tools/setup-reference-manual.mjs --build`.
+Select a position in a page under `Manual/`. The widget displays that module's
+checked document and refreshes on edits. Setup builds six sample pages; other
+pages may build imports when opened. To prepare every page, run `lake build Manual`
+inside the copy. Legacy pages may emit missing-`module` warnings.
 
-The script checks the exact toolchain and shared dependency revisions, reuses
-Cast's built dependencies, and adds the test widget before `#doc` in 205 pages.
-It does not touch another manual checkout. Repeat runs preserve page edits and
-refuse to overwrite changed configuration or test helpers. The checked-in
-[Lake patch](../tests/reference-manual/lakefile.patch) and widget live only in
-test support, not the Cast library.
+For the automated replay:
 
-Place the cursor in a page under `Manual/`. The widget shows that module's
-whole checked document; opening another page changes the preview, and edits
-refresh it through the standard infoview notification/RPC APIs. Setup builds
-Introduction, The Empty Type, Tuples, Integers, Monadic Syntax and Structure
-Declarations. Other pages may build imports when first
-opened; to prepare all of them, run `lake build Manual` inside the copy.
-Do not build that copy and Cast concurrently: their dependencies are shared.
-Existing legacy pages may emit a missing-`module` warning; they are not migrated.
+```sh
+npm run test:reference-manual
+```
 
-This is a raw-document validation mode, not the generated reference website:
-it does not run Manual traversal, resolve references or typeset math. Built-in
-Lean code/output render as text panels; the consumer adds proof-state panels
-and collapsible examples. Example and syntax summaries preserve stored rich
-inlines; grammar displays its stored text without interactive grammar links.
-Figures preserve rich captions. The browser harness stages the two pinned
-screenshots; VS Code asset-URL mapping is not implemented yet.
-Consumer-owned attribute roles reuse Cast's typed highlighting; syntax-kind
-roles preserve authored labels without unresolved links. Inline/block TODO notes
-keep their rich children visible in this raw preview, irrespective of publication
-draft filtering. Malformed role data keeps the named fallback and source children.
-Interactive hover information is not implemented. The adapter
-colours stored Lean tokens with cached native styles, formats inline Lean and
-glossary terms, and displays docstring containers, field signatures, labeled
-file examples, tables and syntax-error diagnostics.
-Unsupported extensions have visible named
-placeholders. The test-only transport uses `ToJson`/`FromJson` and Lean's JSON
-parser, not an optimized codec; its latency is not a renderer benchmark.
+This prepares the copy, builds the widget and six pages, and checks live/SSR
+agreement, controls, retained disclosures, refresh, stale replies, malformed
+input recovery and disposal. It uses the retained package emitted by the widget
+RPC, with a controlled transport rather than a real editor/LSP connection.
+React `act` drains test updates; stale-reply checks require a held request to be
+aborted on a page switch and delivered before checking the current page.
+Edits in this replay change serialized input, not the saved Manual source.
 
-The browser replay validates the public Lake facet and runs the retained package
-that the widget RPC would emit, using the six real elaborated sample pages.
-The widget declares meta/private imports for the Manual implementations it snapshots,
-so those body changes rebuild that package despite ordinary opaque imports.
-The replay tests
-decoding, rendering, page changes, edit refresh, stale replies, malformed input
-recovery and disposal, including edits inside an open example. Its RPC transport
-is controlled, not a real VS Code/LSP connection. Test actions use React `act`
-to drain updates and effects; the stale-reply gate checks that a request was
-held, aborted on page switch and delivered before asserting the current page.
-Screenshots are written under
-`_out/reference-manual/`.
+The consumer adapter renders examples, proof states, grammar, attributes,
+syntax-kind labels and TODO notes. It is a raw-document preview: references,
+citations and generated license/index data can remain visible fallbacks.
+Math is source-only and hover information is not interactive. Browser tests
+stage the sample images; VS Code asset-URL mapping is not implemented.
+Debug enables inspection metadata, not timings. The test codec uses Lean's JSON
+parser and is not a renderer performance baseline.
 
-Each selected page is compared with React SSR from the same decoder/adapter;
-parsed element/text structures must agree. The browser replay writes a source
-extension inventory and remaining visible fallbacks to `coverage.json` in that
-output directory. Its browser page has a sample selector and an expandable SSR
-pane. The ordinary three-way comparison additionally covers nested rich
-summaries and tables against `Output.Html.asString`; Verso layout differences
-remain illustrative, not a universal equality constraint.
+Fixtures and the Lake patch live in [tests/reference-manual](../tests/reference-manual).
+Changes to captured renderer bodies must invalidate the widget package; its
+`meta import all` declarations establish those dependencies. Screenshots and
+the extension/fallback inventory are written to `_out/reference-manual/`.
 
-Remaining fallbacks in this sample include references/citations and generated
-license/index data. They remain visible; this validation does not claim
-whole-manual extension coverage.
+## Source layout
 
-The widget's sticky header contains an off-by-default Debug checkbox and its
-inspection explanation, outside the rendered article. It enables renderer
-metadata only: no clock reads, timing bar, extra RPC request or diagnostic tree
-walk. Named examples use their authored tags; anonymous examples use positional
-keys. The browser edit test changes the serialized document body, not the saved
-manual source or its Lean elaboration.
+The public entry point is `VersoCast.lean`. The main implementation is arranged by
+responsibility:
+
+- `VersoCast/Renderer.lean` traverses documents; `Renderer/` contains its
+  extension contracts, styles, change comparison, internal identity allocation
+  and table helper.
+- `Fingerprint.lean` supplies opt-in retained identities; `RenderPath.lean`
+  defines navigation addresses; `JsStrings.lean` caches native property strings.
+- `Manual.lean`, `Blog.lean` and `Highlighting.lean` implement genre adapters and
+  shared token rendering. The optional Slides adapter lives in `packages/slides/`.
+- `js/katex.mjs` is the optional math component. `examples/` contains small
+  clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages
+  and serves demos.
+
+Keep genre-specific editor behavior in consumers. New renderer behavior should
+have Lean or runtime tests as appropriate; stateful changes need retained React
+DOM checks. Internal sibling identity types are deliberately not root-exported,
+and the public consumer tests that boundary.
 
 ## Runtime assets
 
-`cast-assets` reads `Vir.Resources.Runtime.bundle`, checks the Lean compiler
-identity and writes `.vir/runtime.wasm` plus its identity metadata. SSR tests
-also verify the Wasm SHA-256. Runtime assets and host bindings come from the
-pinned VIR dependency; use the same toolchain and revisions for the Lean build
-and runtime.
+`lake exe cast-assets` obtains the runtime bundled by pinned VIR, checks its Lean
+compiler identity and writes `.vir/runtime.wasm` and metadata. SSR tests verify
+the Wasm checksum. Use matching source and runtime revisions; do not substitute
+an artifact from another toolchain.
 
-Build outputs, runtime assets, browser bundles and dependencies are ignored by
-Git. Only source, tests and dependency lock files belong in commits.
+Dependencies, runtime assets and generated output are ignored by Git. Exact
+dependency revisions belong in Lake/npm lockfiles, and validation reports belong
+under `_out/`, not in checked-in status documents.
