@@ -1,7 +1,7 @@
 /- Copyright (c) 2026 Lean FRO LLC. Released under Apache 2.0 license.
 Author: Emilio J. Gallego Arias -/
 module
-public import CastSlides.Renderers
+public import VersoCastSlides
 public import CastSlides.Fixture
 meta import Vir.Attributes
 
@@ -14,7 +14,7 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 owns neither presentation navigation nor a second imperative DOM runtime. -/
 @[vir_export] def View : ReactM (FunctionComponent Props) := do
   let styles ← Renderer.Styles.create
-  let handlers ← createRenderers styles previewImageUrl?
+  let handlers ← VersoCast.Slides.createRenderers styles previewImageUrl?
   let initial ← LeanRef.toJSL (0 : Nat)
   let next ← Js.Function.ofLean fun (previous : JSL Nat) => do
     LeanRef.toJSL (min document.subParts.size ((← LeanRef.fromJSL previous) + 1))

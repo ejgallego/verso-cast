@@ -27,7 +27,9 @@ read-only native values; each render constructs fresh props. Basic rendering
 needs no JSON, equality or hashing instances. Supply `Renderer.Renderers genre`
 for inline/block/metadata extensions. The opt-in Manual adapter is available
 through `import VersoCast.Manual`; `import VersoCast.Blog` supports raw Page/Post
-documents. A bounded Slides preview lives in the separate test consumer.
+documents. The optional [Slides package](packages/slides/lakefile.lean) exposes
+`import VersoCastSlides` and `VersoCast.Slides.createRenderers`; it does not add
+a Slides dependency to the core package.
 
 The renderer returns a subtree. Stateful extensions use stable ordinary React
 components; extension callbacks themselves are not hook scopes. See the
@@ -78,6 +80,7 @@ runtime assets, individual tests and the three-way HTML comparison.
 | `VersoCast/Manual.lean` | Manual adapter |
 | `VersoCast/Blog.lean` | Shared Page/Post adapter |
 | `VersoCast/Highlighting.lean` | Shared stored Lean-token presentation |
+| `packages/slides/` | Optional Slides genre adapter, without navigation/widget ownership |
 | `js/katex.mjs` | Optional math leaf |
 | `examples/`, `tests/`, `tools/` | Demos, tests and development tooling |
 

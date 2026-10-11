@@ -44,9 +44,11 @@ jobs:
           lake build VersoCastExamples
           npm run test:reference-setup
           npm test
-      - name: Check optional Slides consumer
+      - name: Check optional Slides package and public consumer
         run: |
-          cd tests/slides
+          cd packages/slides
           lake build
+          cd ../../tests/slides
+          lake build CastSlides CastSlides.PublicApi
           cd ../..
           npm run test:slides

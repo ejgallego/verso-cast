@@ -1,6 +1,7 @@
 /- Copyright (c) 2026 Lean FRO LLC. Released under Apache 2.0 license. -/
 module
-public import CastSlides.Renderers
+public import VersoCastSlides
+public import VersoSlides.SlideCode.Export
 meta import Vir.Attributes
 
 public section
@@ -11,7 +12,7 @@ private def leaf : Block Slides := .other (.otherLanguage "text" "<payload>") #[
 
 private def run (kind field : String) : ReactM (Js Node × Nat) := do
   let styles ← Renderer.Styles.create
-  let base ← createRenderers styles
+  let base ← VersoCast.Slides.createRenderers styles
   let visits ← RuntimeRef.new (0 : Nat)
   let handlers : Renderer.Renderers Slides := { base with
     renderBlock? := fun key attributes extension children => do
@@ -46,8 +47,8 @@ private def run (kind field : String) : ReactM (Js Node × Nat) := do
   let resolveImage : ImgSrc → Option String := fun source =>
     match source with
     | .projectRelative "known.svg" => if mapped then some "published/known.svg" else none
-    | _ => imageUrl? source
-  let handlers ← createRenderers styles resolveImage
+    | _ => VersoCast.Slides.imageUrl? source
+  let handlers ← VersoCast.Slides.createRenderers styles resolveImage
   let input : Part Slides := .mk #[.text "Images"] "Images" none #[.para #[
     .other (.image (.remote "https://example.invalid/remote.svg") "Remote <image>" (some "10px") (some "12px") (some "remote-image")) #[],
     .other (.image (.projectRelative "known.svg") "Local" (some "80px") none (some "local-image")) #[],
@@ -69,7 +70,7 @@ private def sampleCode : SlideCode := .seq #[
 /-- Exercise both stored export formats through the actual adapter. -/
 @[vir_export] def renderCode (source : String) (block simple : Bool) : ReactM (Js Node) := do
   let styles ← Renderer.Styles.create
-  let handlers ← createRenderers styles
+  let handlers ← VersoCast.Slides.createRenderers styles
   let encoded := if !source.isEmpty then source else
     if simple then SubVerso.Highlighting.hlToExport (.text "simple <code>") else scToExport sampleCode
   let content : Array (Block Slides) := if block then

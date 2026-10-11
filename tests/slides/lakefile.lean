@@ -1,9 +1,7 @@
 import Lake
 open Lake DSL
 
-require «verso-cast» from "../.."
-require «verso-slides» from git "https://github.com/leanprover/verso-slides" @
-  "268257a4fbdac12c77be726213b51c3ce3a1d41e"
+require «verso-cast-slides» from "../../packages/slides"
 
 package cast_slides where
   leanOptions := #[⟨`experimental.module, true⟩]

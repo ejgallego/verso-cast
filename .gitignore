@@ -9,3 +9,5 @@
 /tests/downstream/lake-manifest.json
 /tests/slides/.lake/
 /tests/slides/.beam/
+/packages/slides/.lake/
+/packages/slides/.beam/

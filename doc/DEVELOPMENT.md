@@ -91,10 +91,19 @@ with editable formula source and display mode.
 
 The Blog comparison uses a checked Post with metadata, a JSON lexer, Lean source
 and output. The Slides comparison builds the isolated [test consumer](../tests/slides/lakefile.lean)
-against `leanprover/verso-slides` at `268257a4fbdac12c77be726213b51c3ce3a1d41e`,
-with the same Lean toolchain and Verso revision as Cast. Slides is not a Cast
-library dependency; its adapter remains in test support until its scope is mature.
-Run `npm run test:slides` separately; CI runs it after the root suite. Both
+of the optional [Slides package](../packages/slides/lakefile.lean), which pins
+`leanprover/verso-slides` at `268257a4fbdac12c77be726213b51c3ce3a1d41e` with the
+same Lean toolchain and Verso revision as Cast. The implementation lives only in
+that package; tests/demos consume `import VersoCastSlides`. The core Cast dependency
+graph has no Slides dependency. Run these sequentially after the root setup:
+
+```sh
+(cd packages/slides && lake build)
+(cd tests/slides && lake build CastSlides CastSlides.PublicApi)
+npm run test:slides
+```
+
+CI runs this sequence after the root suite. Both
 comparisons use actual genre documents, live React, React SSR and the existing
 genre renderer's `Output.Html.asString`. Native reference executables import
 only pure fixtures, not VIR's JavaScript-host-dependent renderer.
@@ -105,16 +114,17 @@ non-Lean code, an explicitly published local image and a basic column-header tab
 Notes/fragments remain visible; ordinary React shell buttons select/highlight a
 source heading while retaining the whole deck. Vertical/background metadata is
 annotated, not converted into Reveal.js grouping/navigation. This is not a
-presenter: arbitrary HTML, slide-specific code/diagrams/animations and row-header
-or striped tables remain named fallbacks. Tables with separator/custom-padding
+presenter: arbitrary HTML, CSS, diagrams, animations and row-header or striped
+tables remain named fallbacks. Stored Lean/slide code is rendered as described
+below. Tables with separator/custom-padding
 flags are also declined; supported tables use Cast's preview styles rather than
 faithfully matching Reveal.js's border flag. Math remains source. Blog's stored hidden
 hover messages are excluded from the visible-code comparison; Cast does not
 implement those hovers. Cross-backend checks are bounded content observations,
 not a promise of identical themes, wrappers or generated sites.
 
-The optional adapter's single factory is `CastSlides.createRenderers styles`,
-in [CastSlides.Renderers](../tests/slides/CastSlides/Renderers.lean); the demo
+The optional adapter's single factory is `VersoCast.Slides.createRenderers styles`,
+in [VersoCastSlides.Renderers](../packages/slides/VersoCastSlides/Renderers.lean); the demo
 component separately owns navigation and React state. It currently accepts
 string attributes `class`, `id`, `title`, `role`, `lang`, `dir`, `aria-label`,
 `aria-hidden`, `aria-labelledby`, `aria-describedby`, and lowercase `data-*`

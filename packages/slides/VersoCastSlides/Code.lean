@@ -6,7 +6,7 @@ public import VersoSlides.SlideCode.Export
 public import Verso.Code.Highlighted
 
 public section
-namespace CastSlides.Code
+namespace VersoCast.Slides.Code
 open VersoSlides SubVerso.Highlighting Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
@@ -83,4 +83,4 @@ partial def render (styles : Styles) (key : String) : SlideCode → ReactM (Js N
       className={← JsValue.ofString ("command-output " ++ (severity info).«class»)}
       style={styles.block}>{Js.Array.ofArray nodes}</span>
 
-end CastSlides.Code
+end VersoCast.Slides.Code

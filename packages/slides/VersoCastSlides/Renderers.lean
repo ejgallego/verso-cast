@@ -4,10 +4,10 @@ module
 public import VersoCast
 public import VersoCast.Renderer.Table
 public import VersoSlides.Render
-public import CastSlides.Code
+import VersoCastSlides.Code
 
 public section
-namespace CastSlides
+namespace VersoCast.Slides
 open Verso Verso.Doc VersoSlides VersoCast Lean.Vir Lean.Vir.React
 open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
 
@@ -152,4 +152,4 @@ def createRenderers (styles : Renderer.Styles)
         Js.Object.set props styles.strings.keys.style (← js%{ "backgroundColor" := (← JsValue.ofString color) })
       return some (← <div @props={props}>{renderDefault none}</div>) }
 
-end CastSlides
+end VersoCast.Slides

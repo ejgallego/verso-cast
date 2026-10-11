@@ -162,6 +162,44 @@ flags do not add expandable UI. No site traversal or script loading is copied.
 The [Post comparison fixture](../tests/VersoCastTests/Blog.lean) illustrates the
 metadata hook and assigns distinct DOM ID prefixes to each document instance.
 
+## Optional Slides package
+
+Slides support is a separate Lake package in `packages/slides`, not a dependency
+of the core Cast package. For a local checkout, add this to the consumer lakefile:
+
+```lean
+require «verso-cast-slides» from "/path/to/verso-cast/packages/slides"
+```
+
+For Git consumption, select the repository's `packages/slides` subdirectory at
+the Cast revision you pin. The package pins its Slides dependency and uses the
+same-checkout Cast core; keep the consumer on the matching Lean toolchain.
+
+```lean
+import VersoCastSlides
+open VersoCast Lean.Vir.React
+
+def createSlidesView (document : Verso.Doc.Part VersoSlides.Slides) :
+    ReactM (FunctionComponent Props) := do
+  let styles ← Renderer.Styles.create
+  let handlers ← VersoCast.Slides.createRenderers styles
+  FunctionComponent.ofLean fun _ =>
+    Renderer.render styles document (renderers := handlers)
+```
+
+The public adapter surface is `VersoCast.Slides.createRenderers styles` and
+`VersoCast.Slides.imageUrl?`. The factory optionally accepts a pure
+`VersoSlides.ImgSrc → Option String` resolver for client-published image URLs;
+the default declines project-relative paths. Decoding/code-tree helpers are
+internal, not re-exported by the package root. Clients can extend the returned
+ordinary `Renderer.Renderers` record (including its math leaf and metadata hook).
+
+This is an always-visible raw-document preview, not a Reveal.js presenter. It
+does not own navigation, widgets, assets, reference traversal or hover/panel
+protocols. The [development guide](DEVELOPMENT.md#browser-demos) lists the supported
+extensions, fallback policy and real three-way comparison. In particular, stored
+code exports are trusted compiler data, not a hostile-graph transport API.
+
 ## Focus and change highlighting
 
 `Options.focus` is a source-navigation address, not a React key or DOM ID.
