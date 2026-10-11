@@ -18,6 +18,7 @@
   "scripts": {
     "test:git-consumer": "node tests/git-consumer.mjs",
     "test:js-package": "node tests/js-package.mjs",
+    "test:comparison-demo": "node tests/comparison-demo.mjs",
     "test": "npm run test:renderer && npm run test:offline && npm run test:identity && npm run test:navigation && npm run test:widget && npm run test:showcase && npm run test:math && npm run test:manual && npm run test:blog",
     "test:blog": "node tests/genre-comparison.mjs blog",
     "test:slides": "node tests/genre-comparison.mjs slides",
@@ -31,7 +32,7 @@
     "test:offline": "node tests/offline-comparison.mjs",
     "test:math": "node tests/math-acceptance.mjs",
     "test:navigation": "node tests/navigation-acceptance.mjs",
-    "compare": "node tests/offline-comparison.mjs",
+    "compare": "node tools/comparison.mjs",
     "compare:serve": "node tools/compare.mjs",
     "compare:blog:serve": "node tools/compare.mjs blog",
     "compare:slides:serve": "node tools/compare.mjs slides",

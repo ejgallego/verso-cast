@@ -49,6 +49,7 @@ Build the optional Slides package and its consumer sequentially:
 (cd packages/slides && lake build)
 (cd tests/slides && lake build CastSlides CastSlides.PublicApi)
 npm run test:slides
+npm run test:comparison-demo
 ```
 
 The root, local consumers and reference-manual copy share dependency build
@@ -65,6 +66,7 @@ Each named test below runs with `npm run <name>`.
 | Consumer build/executable | Public API boundary and native identity helpers |
 | `test:git-consumer`, `test:js-package` | Lean Git packages and packaged JS helper |
 | `test:renderer`, `test:offline` | Rendered nodes, extension contracts and live/SSR fidelity |
+| `test:comparison-demo` | Core/Blog/Slides comparison servers with no Playwright browser installation |
 | `test:identity`, `test:navigation` | Retained state, focus addresses and change markers |
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
@@ -86,14 +88,16 @@ npm run compare:slides:serve
 npm run test:math -- --serve
 ```
 
-The comparison commands currently run their browser checks before serving,
-so they need Playwright's Chromium installation. The plain `demo` does not.
-Prepare the Slides consumer above before viewing its comparison.
+The plain demo and comparison servers need no Playwright browser installation.
+The math command still runs its browser checks before serving, so it needs
+Chromium. Prepare the Slides consumer above before viewing its comparison.
 
 The comparisons show one document through live Cast, React SSR and Verso's
 standard HTML renderer. Live/SSR structures must agree; comparisons with Verso
 check fixture content, not identical themes or whole generated sites.
-`npm run compare` generates the core comparison without serving it.
+`npm run compare` generates the core comparison without serving or validating it.
+Run `npm run test:offline`, `test:blog` or `test:slides` for browser validation;
+those tests use the same generated views as the servers.
 The math demo has editable source and display mode; its SSR pane shows the
 initial formula. Outputs and screenshots are under `_out/`.
 
@@ -170,7 +174,8 @@ responsibility:
   shared token rendering. The optional Slides adapter lives in `packages/slides/`.
 - `js/katex.mjs` is the optional math component. `examples/` contains small
   clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages
-  and serves demos.
+  and serves demos. `tools/comparison.mjs` prepares the shared comparison views;
+  tests add assertions and browser interaction separately.
 
 Keep genre-specific editor behavior in consumers. New renderer behavior should
 have Lean or runtime tests as appropriate; stateful changes need retained React

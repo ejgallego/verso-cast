@@ -59,6 +59,7 @@ jobs:
           lake build CastSlides CastSlides.PublicApi
           cd ../..
           npm run test:slides
+          npm run test:comparison-demo
       - name: Check pinned reference manual preview
         # The manual copy shares Cast dependencies; keep this after other builds.
         run: npm run test:reference-manual

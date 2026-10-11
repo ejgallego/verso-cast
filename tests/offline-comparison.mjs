@@ -1,25 +1,19 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
-import { createElement, Children, isValidElement } from "react";
+import { Children, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { build } from "esbuild";
-import { openTestRuntime, query, root } from "./runtime.mjs";
-import { stageProgram, serveDemo } from "../tools/demo.mjs";
+import { openTestRuntime } from "./runtime.mjs";
+import { prepareComparison } from "../tools/comparison.mjs";
+import { serveDemo } from "../tools/demo.mjs";
 
-execFileSync("lake", ["build", "cast-standard-html"], { cwd: root, stdio: "inherit" });
-const standard = execFileSync(query("cast-standard-html"), [], { encoding: "utf8" });
-const versoHasBlockFootnoteInParagraph = (standard.match(/<p\b[^>]*>[\s\S]*?<\/p>/g) || [])
-  .some(paragraph => paragraph.includes("<details"));
+const { directory, cast, standard, versoHasBlockFootnoteInParagraph } = await prepareComparison();
 const { runtime } = await openTestRuntime("+VersoCastTests.Offline:vir");
 let browser;
 let server;
 try {
-  const View = runtime.call("VersoCastTests.Offline.View", "ssr-");
-  const cast = renderToStaticMarkup(createElement(View));
   const frozenStyle = Object.freeze({ color: "rgb(1, 2, 3)" });
   const probe = () => Children.toArray(runtime.call("VersoCastTests.Offline.propsProbe", frozenStyle).props.children);
   const first = probe();
@@ -84,40 +78,7 @@ try {
     assert.ok(html.includes("&lt;escaped&gt;"), "escaped block code");
     assert.ok(!html.includes("HIDDEN"), "extension can omit its children");
   }
-  const directory = resolve(root, "_out/comparison");
-  await mkdir(directory, { recursive: true });
-  await writeFile(resolve(directory, "cast.html"), cast);
-  await writeFile(resolve(directory, "verso.html"), standard);
-  await stageProgram("+VersoCastTests.Offline:vir", directory);
-  await copyFile(resolve(root, "tests/browser/fixture.svg"), resolve(directory, "fixture.svg"));
-  await build({
-    absWorkingDir: root, entryPoints: ["tests/browser/comparison.mjs"],
-    outfile: resolve(directory, "comparison.js"), bundle: true, format: "esm", target: "es2022",
-  });
-  const comparison = `<!doctype html><html lang="en"><meta charset="utf-8">
-    <title>Cast / Verso / live React comparison</title>
-    <style>
-      body { margin: 24px; font: 16px/1.5 system-ui; color: #24292f; }
-      main { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
-      main > div { min-width: 0; }
-      pre { white-space: pre-wrap; } img { vertical-align: middle; }
-      mark { cursor: pointer; }
-      #live-status { font-size: 13px; } button { margin-bottom: 12px; }
-      @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
-    </style>
-    <h1>Same Verso document: live React, React SSR, Verso HTML</h1>
-    <p>Illustrative comparison: layout, wrappers, CSS and fallback wording may differ.
-    Math is source-preserving; no typesetter is loaded. The live view uses the same Lean component as SSR.</p>
-    <p>Validity note: ${versoHasBlockFootnoteInParagraph ? "Verso's current footnote HTML is repaired by the browser." : "No block footnote in Verso paragraph source."}
-    Cast uses inline markup; its SSR and live document structures are checked for agreement.</p>
-    <main><div><h2>Cast → live React</h2><p id="live-status">Loading live view…</p>
-      <button id="live-update">Redraw live view</button><div id="live"></div></div>
-    <div><h2>Cast → React SSR</h2><div id="cast">${cast}</div></div>
-    <div><h2>Verso → Output.Html.asString</h2><div id="verso">${standard}</div></div></main>
-    <script type="module" src="comparison.js"></script>
-    </html>`;
   const output = resolve(directory, "index.html");
-  await writeFile(output, comparison);
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1800, height: 1100 } });
   const errors = [];

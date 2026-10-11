@@ -1,68 +1,33 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium } from "playwright";
-import { build } from "esbuild";
-import { openTestRuntime, query, root } from "./runtime.mjs";
-import { stageProgram, serveDemo } from "../tools/demo.mjs";
+import { openTestRuntime } from "./runtime.mjs";
+import { prepareComparison } from "../tools/comparison.mjs";
+import { serveDemo } from "../tools/demo.mjs";
 import { checkSlidesContract } from "./slides/contract.mjs";
 
-const cases = {
-  blog: { cwd: root, target: "+VersoCastTests.Blog:vir", standard: "cast-blog-html",
-    entry: "VersoCastTests.Blog.View", title: "Post", note: "Typed Page/Post extensions; no website theme, scripting or reference traversal." },
-  slides: { cwd: resolve(root, "tests/slides"), target: "+CastSlides:vir", standard: "standard-slides",
-    entry: "CastSlides.View", title: "Slides", note: "Inspectable whole-deck preview, not a Reveal.js presenter. Notes/fragments remain visible; navigation highlights source headings." },
-};
 const selected = process.argv.slice(2);
-if (selected.some(name => !cases[name])) throw Error("Expected blog or slides");
-for (const name of selected.length ? selected : Object.keys(cases)) {
-  const spec = cases[name];
-  execFileSync("lake", ["build", spec.standard], { cwd: spec.cwd, stdio: "inherit" });
-  const standard = execFileSync(query(spec.standard, { cwd: spec.cwd }), [], { cwd: spec.cwd, encoding: "utf8" });
-  const { runtime } = await openTestRuntime(spec.target, { cwd: spec.cwd });
+if (selected.some(name => !["blog", "slides"].includes(name))) throw Error("Expected blog or slides");
+for (const name of selected.length ? selected : ["blog", "slides"]) {
+  const { directory, ...spec } = await prepareComparison(name);
   let browser, server;
   try {
-    const View = runtime.call(spec.entry, ...(name === "blog" ? ["ssr-"] : []));
-    const cast = renderToStaticMarkup(createElement(View));
     if (name === "blog") {
-      const page = renderToStaticMarkup(runtime.call("VersoCastTests.Blog.renderPage"));
-      assert.match(page, /class="[^"]*page-panel/);
-      assert.match(page, /class="page-badge"/);
-      assert.match(page, /Blog.component:Missing/);
-      assert.match(page, /Fallback children/);
+      const { runtime } = await openTestRuntime(spec.target, { cwd: spec.cwd });
+      try {
+        const page = renderToStaticMarkup(runtime.call("VersoCastTests.Blog.renderPage"));
+        assert.match(page, /class="[^"]*page-panel/);
+        assert.match(page, /class="page-badge"/);
+        assert.match(page, /Blog.component:Missing/);
+        assert.match(page, /Fallback children/);
+      } finally { runtime.dispose(); }
     }
     if (name === "slides") {
       const { runtime: contract } = await openTestRuntime("+CastSlides.Contract:vir", { cwd: spec.cwd });
       try { checkSlidesContract(contract); } finally { contract.dispose(); }
     }
-    const directory = resolve(root, "_out/genres", name);
-    await stageProgram(spec.target, directory, { cwd: spec.cwd });
-    if (name === "slides") {
-      await mkdir(resolve(directory, "images"), { recursive: true });
-      await copyFile(resolve(spec.cwd, "CastSlides/badge.svg"), resolve(directory, "images/badge.svg"));
-    }
-    await build({ absWorkingDir: root, entryPoints: ["tests/browser/genre-comparison.mjs"],
-      outfile: resolve(directory, "comparison.js"), bundle: true, format: "esm", target: "es2022" });
-    await writeFile(resolve(directory, "cast.html"), cast);
-    await writeFile(resolve(directory, "verso.html"), standard);
-    await writeFile(resolve(directory, "index.html"), `<!doctype html><html lang="en">
-      <meta charset="utf-8"><title>${spec.title} comparison</title>
-      <style>body{margin:24px;font:16px/1.5 system-ui;color:#24292f}
-      main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}main>div{min-width:0}
-      pre{white-space:pre-wrap}nav{display:flex;gap:12px;margin:12px 0}.post-callout{border-left:3px solid #0969da;padding:8px}
-      .post-badge{font-weight:600}.str,.num{color:#0a7a48}.bool,.null{color:#8250df}
-      .hover-container{display:none}.r-hstack{display:flex;align-items:center;gap:24px}
-      [data-slide-vertical="true"]{border-left:3px solid #0969da;padding-left:12px}
-      @media(max-width:1100px){main{grid-template-columns:1fr}}</style>
-      <body data-entry="${spec.entry}" data-fixture="${name}"><h1>${spec.title}: live React / React SSR / Verso HTML</h1>
-      <p>${spec.note} Layout and wrappers may differ; math is source-preserving.</p>
-      <main><div><h2>Live Cast</h2><button id="redraw">Redraw</button><div id="live"></div></div>
-      <div><h2>Cast SSR</h2><div id="cast">${cast}</div></div>
-      <div><h2>Verso Output.Html.asString</h2><div id="verso">${standard}</div></div></main>
-      <script type="module" src="comparison.js"></script></body></html>`);
     browser = await chromium.launch();
     const page = await browser.newPage({ viewport: { width: 1800, height: 1100 } });
     const errors = [];
@@ -158,6 +123,6 @@ for (const name of selected.length ? selected : Object.keys(cases)) {
     console.log(`${spec.title}: live/SSR structure, Verso essentials, interaction and disposal PASS`);
   } finally {
     try { await browser?.close(); }
-    finally { try { if (server) await new Promise(resolve => server.close(resolve)); } finally { runtime.dispose(); } }
+    finally { if (server) await new Promise(resolve => server.close(resolve)); }
   }
 }
