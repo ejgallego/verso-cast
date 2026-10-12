@@ -42,6 +42,14 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
     "zIndex" := (← js#"1"), "padding" := (← js#"8px"),
     "background" := (← JsValue.ofString VersoCast.Renderer.Style.background),
     "borderBottom" := (← js#"1px solid var(--vscode-panel-border, #d0d7de)") }
+  -- Status changes must not change the space occupied by the sticky shell.
+  -- Keep one line beside the controls; long failures remain available via title.
+  let controlsStyle ← js%{ "display" := (← js#"flex"), "alignItems" := (← js#"center"),
+    "gap" := (← js#"12px") }
+  let labelStyle ← js%{ "flexShrink" := (← js#"0"), "whiteSpace" := (← js#"nowrap") }
+  let statusStyle ← js%{ "flex" := (← js#"1"), "minWidth" := (← js#"0"),
+    "margin" := (← js#"0"), "whiteSpace" := (← js#"nowrap"),
+    "overflow" := (← js#"hidden"), "textOverflow" := (← js#"ellipsis") }
   let toggleDebug ← Js.Function.ofLean fun (previous : Js Bool) => Js.Boolean.not previous
   FunctionComponent.ofLean fun props => do
     let input : Input ← LeanRef.fromJSL (← Props.WithData.data props)
@@ -111,8 +119,10 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
       else Js.Nullable.null
     return ← <section>
       <header data-cast-preview-shell="true" style={shellStyle}>
-        <label><input type="checkbox" checked={debugValue} onChange={debugChanged}/> Debug</label>
-        <p role="status">{Lean.Vir.ProofWidgets.Html.text state.status}</p>
+        <div style={controlsStyle}>
+          <label style={labelStyle}><input type="checkbox" checked={debugValue} onChange={debugChanged}/> Debug</label>
+          <p role="status" style={statusStyle} title={(← JsValue.ofString state.status)}>{Lean.Vir.ProofWidgets.Html.text state.status}</p>
+        </div>
         {debugPanel}
       </header>
       {rendered}

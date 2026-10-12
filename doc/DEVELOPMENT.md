@@ -133,6 +133,10 @@ checked document and refreshes on edits. Setup builds six sample pages; other
 pages may build imports when opened. To prepare every page, run `lake build Manual`
 inside the copy. Legacy pages may emit missing-`module` warnings.
 
+Refreshes retain the last successful preview. Loading and error feedback stays
+on one line beside Debug, without moving the document; hover truncated feedback
+to read the full message.
+
 For the automated replay:
 
 ```sh

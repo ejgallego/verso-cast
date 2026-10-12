@@ -133,10 +133,38 @@ try {
   await heading("Introduction").waitFor();
   assert.equal(await page.evaluate(() => window.firstHeading === document.querySelector("article h1")), true);
   assert.equal(await example.evaluate(node => node.open), true, "example disclosure survives a refresh");
+  const previewLayout = () => page.evaluate(() => ({
+    shellHeight: document.querySelector('[data-cast-preview-shell]').getBoundingClientRect().height,
+    documentOffset: document.querySelector("#app article").getBoundingClientRect().top -
+      document.querySelector("#app section").getBoundingClientRect().top,
+  }));
+  // Infoview is often narrow; status must not wrap into another shell row.
+  await page.locator("#app").evaluate(node => { node.style.width = "280px"; });
+  const readyLayout = await previewLayout();
+  await page.evaluate(() => {
+    window.manualPreview.hold(true);
+    return window.manualPreview.edit();
+  });
+  await page.getByRole("status").filter({ hasText: "Loading page…" }).waitFor();
+  assert.deepEqual(await previewLayout(), readyLayout,
+    "loading feedback must not resize the shell or displace the retained document");
+  assert.equal(await example.evaluate(node => node === window.retainedExample && node.open), true);
+  await page.evaluate(() => {
+    window.manualPreview.hold(false);
+    return window.manualPreview.release();
+  });
+  await page.waitForFunction(() => document.querySelector('[role="status"]').textContent === "");
+  assert.deepEqual(await previewLayout(), readyLayout, "completion must not displace the document");
   await page.evaluate(() => window.manualPreview.malformed(true));
   await page.getByRole("status").filter({ hasText: "Invalid manual preview:" }).waitFor();
+  assert.deepEqual(await previewLayout(), readyLayout,
+    "error feedback must not displace the last successful document either");
+  const status = page.getByRole("status");
+  assert.equal(await status.getAttribute("title"), await status.textContent(),
+    "the full error remains available when visually truncated");
   await heading("Introduction").waitFor();
   await page.evaluate(() => window.manualPreview.malformed(false));
+  await page.locator("#app").evaluate(node => { node.style.removeProperty("width"); });
   await page.evaluate(() => {
     window.manualPreview.hold(true);
     return window.manualPreview.edit();
