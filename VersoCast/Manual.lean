@@ -8,6 +8,7 @@ public import VersoCast.Renderer.Table
 public import VersoManual.Table
 public import VersoManual.Docstring
 public import VersoManual.InlineLean.IO
+import VersoManual.Index
 
 public section
 namespace VersoCast.Manual
@@ -47,6 +48,15 @@ def createRenderers (styles : Renderer.Styles) : ReactM (Renderer.Renderers Vers
       else if ext.name == `Verso.Genre.Manual.tech then
         let .arr #[.str _, _, _] := ext.data | return none
         return some (← <em key={← JsValue.ofString key}>{Js.Array.ofArray (← children ())}</em>)
+      else if ext.name == `Verso.Genre.Manual.index || ext.name == `Verso.Genre.Manual.see then
+        let valid := if ext.name == `Verso.Genre.Manual.index then
+          (Lean.fromJson? (α := Verso.Genre.Manual.Index.Entry) ext.data).isOk
+        else (Lean.fromJson? (α := Verso.Genre.Manual.Index.See) ext.data).isOk
+        if !valid then return none
+        -- These annotate an index, not the visible prose. No traversal/anchors;
+        -- retain any supplied children rather than displaying the metadata.
+        let props ← js%{ "key" := (← JsValue.ofString key) }
+        return some (← Node.fragment props (← Js.Array.ofArray (← children ())))
       else return none
     renderBlock? := fun _ attributes ext children => do
       if ext.name == `Verso.Genre.Manual.Block.table then

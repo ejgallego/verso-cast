@@ -47,6 +47,18 @@ export function checkManualExtensions(runtime, documents) {
   assert.equal(text(syntaxNode), "authored <kind>", "use the authored label, not the resolved-name child");
   assert.match(renderToStaticMarkup(syntaxNode), /authored &lt;kind&gt;/);
 
+  for (const name of ["Verso.Genre.Manual.index", "Verso.Genre.Manual.see"]) {
+    const annotation = source(name);
+    assert.equal(text(inline(annotation)), "", "checked index metadata is not visible prose");
+    annotation.content = [{ emph: [{ text: "Annotation child <escaped>" }] }];
+    assert.equal(text(inline(annotation)), "Annotation child <escaped>",
+      "valid annotations preserve explicitly supplied children");
+    assert.match(renderToStaticMarkup(inline(annotation)), /<em[^>]*>Annotation child &lt;escaped&gt;<\/em>/);
+    annotation.container.data = true;
+    assert.equal(text(inline(annotation)), `[inline extension: ${name}]Annotation child <escaped>`,
+      "malformed metadata keeps its marker and children once");
+  }
+
   const todo = source("Manual.TODO");
   todo.content = [{ emph: [{ text: "Pending <work> & detail" }] }];
   const todoNode = inline(todo);

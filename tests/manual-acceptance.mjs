@@ -29,6 +29,16 @@ try {
   assert.match(html, /<thead><tr/);
   assert.match(html, /<tbody><tr/);
   assert.match(html, /scope="col"/);
+  assert.match(html, /Before index <em[^>]*>index child<\/em> after index/,
+    "valid index annotations preserve children without a placeholder");
+  assert.match(html, /<p[^>]*>see child<\/p>/);
+  assert.doesNotMatch(html, /hidden index term|hidden source|hidden target/,
+    "index metadata does not become visible document text");
+  for (const name of ["index", "see"]) {
+    assert.equal((html.match(new RegExp(`\\[inline extension: Verso.Genre.Manual.${name}\\]`, "g")) ?? []).length, 1,
+      "only malformed annotation data keeps a placeholder");
+    assert.equal((html.match(new RegExp(`invalid ${name} child`, "g")) ?? []).length, 1);
+  }
   for (const text of ["Internal.name : Nat", "private field : Nat", "internal documentation",
     "field documentation", "Inherited from", "Parent", "stdin", "input &lt;text&gt;", "File: Example.lean"])
     assert.ok(html.includes(text), text);

@@ -103,6 +103,9 @@ output, inline Lean, tactic snippets, signatures, docstrings, tables, file
 examples, paragraph groups and syntax-error diagnostics. Output preserves
 message severity, summary flags and trace-expansion settings. Tables retain
 headers and alignment. Glossary terms display without unresolved links.
+Valid `index` and `see` annotations do not display their indexing metadata;
+any supplied children remain visible. No index or target anchors are generated,
+and malformed annotation data keeps the visible fallback.
 
 Styles use VS Code CSS variables with browser fallbacks. Token colours
 approximate semantic categories; interactive hovers are not implemented.

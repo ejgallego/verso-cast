@@ -2,6 +2,7 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Manual
+import VersoManual.Index
 meta import Vir.Attributes
 
 public section
@@ -62,7 +63,19 @@ private def table (columns : Nat) : Block Genre.Manual := .other {
         data := toJson Verso.Genre.Manual.InlineLean.FileType.stdin } #[.code "input <text>"],
       .other {
         name := `Verso.Genre.Manual.InlineLean.Block.exampleLeanFile
-        data := toJson "Example.lean" } #[.code "def example := 1"]] #[]
+        data := toJson "Example.lean" } #[.code "def example := 1"],
+      .para #[.text "Before index ",
+        .other {
+          name := `Verso.Genre.Manual.index
+          data := toJson ({ term := .text "hidden index term" } : Verso.Genre.Manual.Index.Entry) }
+          #[.emph #[.text "index child"]],
+        .text " after index"],
+      .para #[.other {
+          name := `Verso.Genre.Manual.see
+          data := toJson ({ source := .text "hidden source", target := .text "hidden target", subTarget := none }
+            : Verso.Genre.Manual.Index.See) } #[.text "see child"]],
+      .para #[.other { name := `Verso.Genre.Manual.index, data := .null } #[.text "invalid index child"]],
+      .para #[.other { name := `Verso.Genre.Manual.see, data := .null } #[.text "invalid see child"]]] #[]
   VersoCast.Renderer.render styles doc { focus := some "part-root-block-0" } renderers
 
 /-- Debug changes attributes, not navigation, highlighting or React identity. -/

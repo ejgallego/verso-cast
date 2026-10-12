@@ -17,7 +17,8 @@ const handledExtensions = ["Verso.Genre.Manual.Block.table", "Verso.Genre.Manual
   "Verso.Genre.Manual.Block.internalSignature", "Verso.Genre.Manual.Block.fieldSignature",
   "Verso.Genre.Manual.InlineLean.Block.exampleFile", "Verso.Genre.Manual.InlineLean.Block.exampleLeanFile",
   "Manual.example", "Manual.syntax", "Manual.grammar", "Manual.keyword", "Manual.figure",
-  "Manual.attr", "Manual.attrs", "Manual.syntaxKind", "Manual.TODO"];
+  "Manual.attr", "Manual.attrs", "Manual.syntaxKind", "Manual.TODO",
+  "Verso.Genre.Manual.index", "Verso.Genre.Manual.see"];
 const run = args => execFileSync("lake", args, { cwd: manual, stdio: "inherit" });
 run(["build", "CastManualPreview", ...pages.map(page => `+${page.module}:olean`)]);
 run(["env", "lean", "--run", "cast-preview/ExportPages.lean"]);
