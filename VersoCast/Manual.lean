@@ -118,15 +118,7 @@ def createRenderers (styles : Renderer.Styles) : ReactM (Renderer.Renderers Vers
             SubVerso.Highlighting.Highlighted.Message × Bool × List Lean.Name) :=
           Lean.fromJson? ext.data | return none
         let props ← attributes "lean-output" (highlighting.message msg.severity)
-        let severity := msg.severity.toString
-        Js.Object.set props (← js#"data-verso-message-severity") (← JsValue.ofString severity)
-        let content ← <pre style={highlighting.block}><code>{ProofWidgets.Html.text (msg.toString expandTraces)}</code></pre>
-        if summarize then
-          return some (← <details @props={props}><summary style={labelStyle}>
-            {ProofWidgets.Html.text severity}</summary>{pure content}</details>)
-        else
-          return some (← <div @props={props}><div style={labelStyle}>
-            {ProofWidgets.Html.text severity}</div>{pure content}</div>)
+        return some (← Highlighting.renderMessage highlighting labelStyle props msg summarize expandTraces)
       else if ext.name == `Verso.Genre.Manual.Block.constructorSignature ||
           ext.name == `Verso.Genre.Manual.leanFromMarkdown ||
           ext.name == `Verso.Genre.Manual.InlineLean.Block.signature then

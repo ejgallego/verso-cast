@@ -78,4 +78,21 @@ leaves into another typed renderer. Descendant token keys stay local. -/
 def render (styles : Styles) (value : Highlighted) (key : String := "root") : ReactM (Js Node) :=
   renderAt styles key value
 
+/-- Shared compiler-message presentation. The caller supplies fresh outer props
+with its source identity and a factory-created label style. Summarized messages
+use native details state; ordinary messages remain expanded. -/
+def renderMessage (styles : Styles) (labelStyle props : Js Props)
+    (message : Highlighted.Message) (summarize : Bool)
+    (expandTraces : List Lean.Name := []) : ReactM (Js Node) := do
+  let severity := message.severity.toString
+  Js.Object.set props (← js#"data-verso-message-severity") (← JsValue.ofString severity)
+  let content ← <pre style={styles.block}><code>
+    {ProofWidgets.Html.text (message.toString expandTraces)}</code></pre>
+  if summarize then
+    return ← <details @props={props}><summary style={labelStyle}>
+      {ProofWidgets.Html.text severity}</summary>{pure content}</details>
+  else
+    return ← <div @props={props}><div style={labelStyle}>
+      {ProofWidgets.Html.text severity}</div>{pure content}</div>
+
 end VersoCast.Highlighting

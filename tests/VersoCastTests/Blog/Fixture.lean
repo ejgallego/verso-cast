@@ -8,7 +8,12 @@ public section
 namespace VersoCastTests.Blog
 open Verso Verso.Doc Verso.Genre.Blog
 
-def document : Part Post := %doc VersoCastTests.Blog.Post
+def document : Part Post :=
+  let authored := %doc VersoCastTests.Blog.Post
+  { authored with content := authored.content ++ #[
+    .other (.message true { severity := .warning, contents := .text "Warning <script> & detail" } [])
+      #[.code "MESSAGE_CHILD_MUST_NOT_RENDER_TWICE"],
+    .other (.message false { severity := .info, contents := .text "Expanded information" } []) #[]] }
 
 def byline : String :=
   match document.metadata with

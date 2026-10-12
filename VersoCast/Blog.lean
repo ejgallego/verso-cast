@@ -42,6 +42,7 @@ HTML keep visible fallbacks; no site traversal or scripting is copied here. -/
 def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles) :
     ReactM (Renderer.Renderers g) := do
   let highlighting ← Highlighting.Styles.create
+  let labelStyle ← js%{ "fontWeight" := (← js#"600"), "fontSize" := (← js#"0.8rem") }
   let lexed := fun (content : Genre.Blog.LexedText) => do
     content.content.mapIdxM fun index (category, text) => do
       let props ← js%{ "key" := (← JsValue.ofString s!"token:{index}") }
@@ -77,9 +78,9 @@ def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles
         let props ← attributes "lexed" highlighting.block
         Js.Object.set props (← js#"data-language") (← JsValue.ofString content.name)
         return some (← <pre @props={props}><code>{Js.Array.ofArray (← lexed content)}</code></pre>)
-      | .message _summarize message traces =>
+      | .message summarize message traces =>
         let props ← attributes "lean-output" (highlighting.message message.severity)
-        return some (← <pre @props={props}><code>{ProofWidgets.Html.text (message.toString traces)}</code></pre>)
+        return some (← Highlighting.renderMessage highlighting labelStyle props message summarize traces)
       | .htmlDiv classes =>
         let props ← attributes "html-div" styles.part
         Renderer.appendClass props styles.strings.keys.className (← JsValue.ofString s!" {classes}")

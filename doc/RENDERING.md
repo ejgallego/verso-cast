@@ -126,12 +126,13 @@ when composing multiple highlighting leaves.
 Import `VersoCast.Blog` and create `Blog.createRenderers genre styles` in the
 factory. It supports Page and Post through their `BlogGenre` instances, handling
 highlighted Lean, compiler messages, lexed text, HTML spans/divs and docstring
-containers. Blog and Manual share token presentation.
+containers. Blog and Manual share token and compiler-message presentation.
+Summarized messages use native disclosures; ordinary messages stay expanded.
+Disclosure state survives redraws while the block's React identity is retained.
 
 The client supplies publication metadata, heading IDs, authors/dates and themes.
 References, registered site components, arbitrary HTML blobs/wrappers/details
-and docstring sections retain named fallbacks. Hover data is not interactive,
-and message summary flags do not add expandable UI. The
+and docstring sections retain named fallbacks. Hover data is not interactive. The
 [Post fixture](../tests/VersoCastTests/Blog.lean) shows the metadata hook and
 distinct DOM ID prefixes for multiple document instances.
 

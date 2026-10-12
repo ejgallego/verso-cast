@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium } from "playwright";
@@ -15,6 +15,12 @@ for (const name of selected.length ? selected : ["blog", "slides"]) {
   let browser, server;
   try {
     if (name === "blog") {
+      const html = await readFile(resolve(directory, "cast.html"), "utf8");
+      assert.match(html, /<details[^>]*data-verso-message-severity="warning"/,
+        "summarized Blog output uses a disclosure");
+      assert.match(html, /<summary[^>]*>warning<\/summary>/);
+      assert.match(html, /Warning &lt;script&gt; &amp; detail/);
+      assert.doesNotMatch(html, /<script>|MESSAGE_CHILD_MUST_NOT_RENDER_TWICE/);
       const { runtime } = await openTestRuntime(spec.target, { cwd: spec.cwd });
       try {
         const page = renderToStaticMarkup(runtime.call("VersoCastTests.Blog.renderPage"));
@@ -88,6 +94,18 @@ for (const name of selected.length ? selected : ["blog", "slides"]) {
       assert.ok(await page.locator("#live span.str").count());
       assert.equal(await page.locator("#live .post-badge").textContent(), "typed extensions");
       assert.ok(observations.live.code.includes("hello <escaped>"));
+      const output = page.locator('#live details[data-verso-message-severity="warning"]');
+      assert.equal(await output.evaluate(node => node.open), false);
+      assert.equal(await page.locator('#live details[data-verso-message-severity="info"]').count(), 0,
+        "unsummarized output stays expanded");
+      await output.locator("summary").click();
+      assert.equal(await output.evaluate(node => node.open), true);
+      await output.evaluate(node => { window.retainedBlogOutput = node; });
+      const commits = await page.evaluate(() => window.genreComparison.commits);
+      await page.locator("#redraw").click();
+      await page.waitForFunction(previous => window.genreComparison.commits > previous, commits);
+      assert.equal(await output.evaluate(node => node === window.retainedBlogOutput && node.open), true,
+        "redraw preserves the disclosure DOM node and its open state");
     } else {
       assert.deepEqual(observations.live.fragments, [["First fragment.", "2"], ["Second fragment.", "2"], ["inline emphasis", null]]);
       assert.deepEqual(observations.live.nested, ["Nested decoration."]);
