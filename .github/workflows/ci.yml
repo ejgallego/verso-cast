@@ -35,7 +35,7 @@ jobs:
       - name: Check public consumer
         working-directory: tests/downstream
         run: |
-          lake build
+          lake build Consumer Consumer.GenreAdapters
           lake exe consumer
       - name: Check clean Git package consumers
         run: node tests/git-consumer.mjs

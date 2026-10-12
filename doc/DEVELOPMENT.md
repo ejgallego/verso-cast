@@ -27,7 +27,7 @@ libraries needed by the browser tests.
 Run the local-path consumer after the root build:
 
 ```sh
-(cd tests/downstream && lake build && lake exe consumer)
+(cd tests/downstream && lake build Consumer Consumer.GenreAdapters && lake exe consumer)
 ```
 
 For fresh Git consumers of committed `HEAD`, rather than working-tree edits:
@@ -37,8 +37,8 @@ npm run test:git-consumer
 ```
 
 This gate needs only Node, Git and Lean, so it can run before `npm ci`. It checks
-core and Slides-subdirectory consumption, dependency pins and public APIs in
-temporary checkouts. The directories are removed on success or failure.
+core, Manual/Page/Post factories and Slides-subdirectory consumption, dependency
+pins and public APIs in temporary checkouts. The directories are removed on success or failure.
 The JS package test separately extracts an npm tarball and imports its KaTeX
 helper from an external consumer, reusing installed test dependencies.
 Neither test publishes a package.
@@ -63,7 +63,7 @@ Each named test below runs with `npm run <name>`.
 | Command | Coverage |
 | --- | --- |
 | `lake test` | Identities, hash collisions, retirement and change comparison |
-| Consumer build/executable | Public API boundary and native identity helpers |
+| Consumer build/executable | Public core and Manual/Page/Post factory APIs (compile-only); native identity helpers |
 | `test:git-consumer`, `test:js-package` | Lean Git packages and packaged JS helper |
 | `test:renderer`, `test:offline` | Rendered nodes, extension contracts and live/SSR fidelity |
 | `test:comparison-demo` | Core/Blog/Slides comparison servers with no Playwright browser installation |

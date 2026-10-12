@@ -49,13 +49,13 @@ async function checkLock(directory, dependency, manifest = "lake-manifest.json")
 try {
   console.log(`Clean Git consumers: committed Cast ${revision} (not working-tree edits)`);
   const gitSource = `from git ${JSON.stringify(sourceUrl)} @ ${JSON.stringify(revision)}`;
-  const core = await prepare("core", "tests/downstream", ["Consumer.lean", "Main.lean"],
+  const core = await prepare("core", "tests/downstream", ["Consumer.lean", "Consumer/GenreAdapters.lean", "Main.lean"],
     'require «verso-cast» from "../.."', `require «verso-cast» ${gitSource}`);
-  lake(core, "build");
+  lake(core, "build", "Consumer", "Consumer.GenreAdapters");
   lake(core, "exe", "consumer");
   const coreLock = await checkLock(core, "«verso-cast»");
   assert.ok(!coreLock.packages.some(pkg => pkg.name === "«verso-slides»"), "core does not depend on Slides");
-  console.log("Core Git consumer: public API and native identity helpers PASS");
+  console.log("Core Git consumer: public API, Manual/Page/Post factories and native identity helpers PASS");
 
   const slides = await prepare("slides", "tests/slides", ["CastSlides/PublicApi.lean"],
     'require «verso-cast-slides» from "../../packages/slides"',
