@@ -88,6 +88,18 @@ def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles
       | .docstring _ _ =>
         let props ← attributes "docstring" styles.blockquote
         return some (← <section @props={props}>{Js.Array.ofArray (← children.render ())}</section>)
+      | .docstringSection level =>
+        if level > 5 then return none
+        let some (title, body) := children.splitParagraph? () | return none
+        let props ← attributes "docstring-section" styles.part
+        let (headingProps, inlines) ← title ()
+        -- Reuse the title paragraph's key/source/focus/change attributes.
+        Js.Object.set headingProps styles.strings.keys.style styles.heading
+        Js.Object.set headingProps styles.strings.keys.dataVersoKind (← js#"docstring-heading")
+        let heading ← Node.createElement
+          (← ElementType.tag (← JsValue.ofString s!"h{level + 1}")) headingProps
+          (← Js.Array.ofArray inlines)
+        return some (← <section @props={props}>{pure heading}{Js.Array.ofArray (← body ())}</section>)
       | _ => return none }
 
 end VersoCast.Blog

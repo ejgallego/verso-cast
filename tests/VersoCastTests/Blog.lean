@@ -32,8 +32,36 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
   let handlers ← VersoCast.Blog.createRenderers Page styles
   let input : Part Page := .mk #[.text "Page"] "Page" none #[
     .other (.htmlDiv "page-panel") #[.para #[.other (.htmlSpan "page-badge") #[.text "Page badge"]]],
-    .other (.component `Missing .null) #[.para #[.text "Fallback children"]]
+    .other (.component `Missing .null) #[.para #[.text "Fallback children"]],
+    .other (.docstringSection 0) #[
+      .para #[.text "Page ", .emph #[.text "docstring"]], .para #[.text "Page section body"]],
+    .other (.docstringSection 1) #[.code "Missing title survives", .para #[.text "Malformed body survives"]],
+    .other (.docstringSection 2) #[],
+    .other (.docstringSection 6) #[.para #[.text "Unsupported level survives"]]
   ] #[]
-  Renderer.render styles input (renderers := handlers)
+  Renderer.render styles input {
+    focus := some "part-root-block-2-block-0", changedIds := #["part-root-block-2-block-0"] }
+    (renderers := handlers)
+
+/-- Title inspection is lazy; supported and fallback children render once. -/
+@[vir_export] def sectionWork (mode : Nat) : ReactM Nat := do
+  let styles ← Renderer.Styles.create
+  let base ← VersoCast.Blog.createRenderers Page styles
+  let visits ← RuntimeRef.new (0 : Nat)
+  let handlers : Renderer.Renderers Page := { base with
+    renderInline? := fun key extension children => do
+      visits.modify (· + 1)
+      base.renderInline? key extension children }
+  let leaf : Inline Page := .other (.htmlSpan "counted") #[.text "counted"]
+  let title : Block Page := .para #[leaf]
+  let content : Array (Block Page) := match mode with
+    | 0 => #[title, .para #[leaf]]
+    | 1 => #[.blockquote #[title], .para #[leaf]]
+    | 2 => #[title]
+    | _ => #[]
+  let input : Part Page := .mk #[] "" none
+    #[.other (.docstringSection (if mode == 2 then 6 else 1)) content] #[]
+  let _ ← Renderer.render styles input (renderers := handlers)
+  visits.get
 
 end VersoCastTests.Blog

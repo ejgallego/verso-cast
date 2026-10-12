@@ -129,10 +129,13 @@ highlighted Lean, compiler messages, lexed text, HTML spans/divs and docstring
 containers. Blog and Manual share token and compiler-message presentation.
 Summarized messages use native disclosures; ordinary messages stay expanded.
 Disclosure state survives redraws while the block's React identity is retained.
+Docstring sections turn their leading title paragraph into a heading and retain
+the following body blocks. Levels 0–5 map to `h1`–`h6`; a missing title paragraph
+or an out-of-range level keeps the visible fallback and its children.
 
 The client supplies publication metadata, heading IDs, authors/dates and themes.
-References, registered site components, arbitrary HTML blobs/wrappers/details
-and docstring sections retain named fallbacks. Hover data is not interactive. The
+References, registered site components and arbitrary HTML blobs/wrappers/details
+retain named fallbacks. Hover data is not interactive. The
 [Post fixture](../tests/VersoCastTests/Blog.lean) shows the metadata hook and
 distinct DOM ID prefixes for multiple document instances.
 

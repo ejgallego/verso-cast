@@ -13,7 +13,12 @@ def document : Part Post :=
   { authored with content := authored.content ++ #[
     .other (.message true { severity := .warning, contents := .text "Warning <script> & detail" } [])
       #[.code "MESSAGE_CHILD_MUST_NOT_RENDER_TWICE"],
-    .other (.message false { severity := .info, contents := .text "Expanded information" } []) #[]] }
+    .other (.message false { severity := .info, contents := .text "Expanded information" } []) #[],
+    .other (.docstringSection 1) #[
+      .para #[.text "A ", .bold #[.text "docstring heading"]],
+      .para #[.text "Docstring body <escaped>"],
+      .blockquote #[.para #[.text "Nested docstring content"]]],
+    .other (.docstringSection 5) #[.para #[.text "Deep docstring heading"]]] }
 
 def byline : String :=
   match document.metadata with

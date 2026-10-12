@@ -21,6 +21,10 @@ for (const name of selected.length ? selected : ["blog", "slides"]) {
       assert.match(html, /<summary[^>]*>warning<\/summary>/);
       assert.match(html, /Warning &lt;script&gt; &amp; detail/);
       assert.doesNotMatch(html, /<script>|MESSAGE_CHILD_MUST_NOT_RENDER_TWICE/);
+      assert.match(html, /<h2[^>]*data-verso-kind="docstring-heading"[^>]*>A <strong>docstring heading<\/strong><\/h2>/,
+        "Post docstring title becomes a rich heading");
+      assert.match(html, /<h6[^>]*>Deep docstring heading<\/h6>/);
+      assert.equal((html.match(/Docstring body &lt;escaped&gt;/g) ?? []).length, 1);
       const { runtime } = await openTestRuntime(spec.target, { cwd: spec.cwd });
       try {
         const page = renderToStaticMarkup(runtime.call("VersoCastTests.Blog.renderPage"));
@@ -28,6 +32,16 @@ for (const name of selected.length ? selected : ["blog", "slides"]) {
         assert.match(page, /class="page-badge"/);
         assert.match(page, /Blog.component:Missing/);
         assert.match(page, /Fallback children/);
+        assert.match(page, /<h1[^>]*data-verso-kind="docstring-heading"[^>]*data-verso-change="changed"[^>]*data-verso-focus="cursor"[^>]*>Page <em>docstring<\/em><\/h1>/,
+          "Page heading retains source, focus and change attributes");
+        for (const text of ["Page section body", "Missing title survives", "Malformed body survives", "Unsupported level survives"])
+          assert.equal((page.match(new RegExp(text, "g")) ?? []).length, 1, text);
+        assert.equal((page.match(/\[block extension: Blog.docstringSection\]/g) ?? []).length, 3,
+          "missing, empty and out-of-range titles retain visible fallback");
+        assert.doesNotMatch(page, /<h7/);
+        for (const [mode, expected] of [[0n, 2n], [1n, 2n], [2n, 1n], [3n, 0n]])
+          assert.equal(runtime.call("VersoCastTests.Blog.sectionWork", mode), expected,
+            "each selected or fallback child renders once");
       } finally { runtime.dispose(); }
     }
     if (name === "slides") {
@@ -101,11 +115,17 @@ for (const name of selected.length ? selected : ["blog", "slides"]) {
       await output.locator("summary").click();
       assert.equal(await output.evaluate(node => node.open), true);
       await output.evaluate(node => { window.retainedBlogOutput = node; });
+      await page.evaluate(() => {
+        window.retainedBlogHeading = document.querySelector('#live [data-verso-kind="docstring-heading"]');
+      });
       const commits = await page.evaluate(() => window.genreComparison.commits);
       await page.locator("#redraw").click();
       await page.waitForFunction(previous => window.genreComparison.commits > previous, commits);
       assert.equal(await output.evaluate(node => node === window.retainedBlogOutput && node.open), true,
         "redraw preserves the disclosure DOM node and its open state");
+      assert.equal(await page.evaluate(() => window.retainedBlogHeading ===
+        document.querySelector('#live [data-verso-kind="docstring-heading"]')), true,
+        "redraw retains the docstring heading DOM node");
     } else {
       assert.deepEqual(observations.live.fragments, [["First fragment.", "2"], ["Second fragment.", "2"], ["inline emphasis", null]]);
       assert.deepEqual(observations.live.nested, ["Nested decoration."]);
