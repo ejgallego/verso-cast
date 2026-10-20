@@ -113,6 +113,27 @@ Place the cursor inside `showcase_ready`. The smaller
 cursor anchor. These widgets display math source; the browser math demo typesets
 it. Restart the Lean server or reopen the file after refreshing runtime assets.
 
+## Generated document codec acceptance
+
+The isolated codec adoption branch targets Lean 4.35.0 final and VIR PR268.
+Its first gate requires the qualified SDK from source `987a76a5`, whose source
+tree equals landed `81de859a`; the default stable SDK predates this feature.
+Use VIR's standard archive selector:
+
+```sh
+VIR_SDK_ARCHIVE=/path/to/matched/lean-vir-sdk.tar.gz npm run test:json-safe
+```
+
+The test verifies all SDK payload hashes and runs a compiled native writer →
+JSON-RPC String envelope → JavaScript parse → public `callWith` on both Wasm
+profiles. Independent Lean observations cover every Manual metadata field,
+exact numbers, recursive parts and checked NameMap construction. Rejection,
+recovery and disposal are checked as well. This does not exercise an editor
+connection, rendering, retained React state or performance.
+
+The renderer and examples still need migration from bare JSX to VIR's explicit
+`jsx%{…}` syntax before this dependency update can replace the working demo.
+
 ## Lean reference manual validation
 
 The setup helper creates a pinned copy under `.local/reference-manual`, adds

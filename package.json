@@ -16,6 +16,7 @@
     "react": "^19.2.7"
   },
   "scripts": {
+    "test:json-safe": "node tests/json-safe.mjs",
     "test:git-consumer": "node tests/git-consumer.mjs",
     "test:js-package": "node tests/js-package.mjs",
     "test:comparison-demo": "node tests/comparison-demo.mjs",
