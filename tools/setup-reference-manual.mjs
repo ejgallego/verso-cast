@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { pages as samplePages } from "../tests/reference-manual/pages.mjs";
 
-export const manualRevision = "349244b4dd2f284728c1dacb621cc74a32f9929b";
+export const manualRevision = "400f1682df64bc00e485215bfa4398d24c0f220c";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const destination = resolve(root, ".local/reference-manual");
 const fixtures = resolve(root, "tests/reference-manual");

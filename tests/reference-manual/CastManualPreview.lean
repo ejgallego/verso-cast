@@ -114,10 +114,10 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
           Js.Nullable.ofJs (← VersoCast.Renderer.render styles doc { debug }
           (renderers := renderers))
     let debugPanel : ReactM (Js.Nullable Node) := if debug then do
-      Js.Nullable.ofJs (← <aside data-cast-debug="true">Inspection metadata enabled. Keys use author identities when supplied,
-        otherwise positions. Timing instrumentation is disabled.</aside>)
+      Js.Nullable.ofJs (← jsx%{<aside data-cast-debug="true">Inspection metadata enabled. Keys use author identities when supplied,
+        otherwise positions. Timing instrumentation is disabled.</aside>})
       else Js.Nullable.null
-    return ← <section>
+    return ← jsx%{<section>
       <header data-cast-preview-shell="true" style={shellStyle}>
         <div style={controlsStyle}>
           <label style={labelStyle}><input type="checkbox" checked={debugValue} onChange={debugChanged}/> Debug</label>
@@ -126,13 +126,13 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
         {debugPanel}
       </header>
       {rendered}
-    </section>
+    </section>}
 
 /-- Test-only direct path for React SSR, using the same decoder and renderers as
 the retained widget, without its editor/RPC shell. -/
 @[vir_export] def renderDocument (encoded : String) : ReactM (Js Node) := do
   match decodeDocument encoded with
-  | .error error => <p role="alert">{ProofWidgets.Html.text error}</p>
+  | .error error => jsx%{<p role="alert">{ProofWidgets.Html.text error}</p>}
   | .ok document => do
     let styles ← VersoCast.Renderer.Styles.create
     VersoCast.Renderer.render styles document (renderers := (← Extensions.create styles))

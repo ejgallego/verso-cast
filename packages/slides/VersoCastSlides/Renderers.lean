@@ -70,12 +70,12 @@ def createRenderers (styles : Renderer.Styles)
         let props ← js%{ "key" := (← JsValue.ofString key),
           "className" := (← JsValue.ofString (fragmentClass style)) }
         if let some index := index then Js.Object.set props fragmentKey (← JsValue.ofString (toString index))
-        return some (← <span @props={props}>{Js.Array.ofArray (← children ())}</span>)
+        return some (← jsx%{<span @props={props}>{Js.Array.ofArray (← children ())}</span>})
       | .styled fields =>
         let some apply ← prepareAttributes styles fields | return none
         let props ← js%{ "key" := (← JsValue.ofString key), "className" := (← js#"") }
         apply props
-        return some (← <span @props={props}>{Js.Array.ofArray (← children ())}</span>)
+        return some (← jsx%{<span @props={props}>{Js.Array.ofArray (← children ())}</span>})
       | .image source alt width height cssClass =>
         let some url := resolveImage source | return none
         if url.isEmpty then return none
@@ -85,23 +85,23 @@ def createRenderers (styles : Renderer.Styles)
         if let some height := height then Js.Object.set imageStyle (← js#"height") (← JsValue.ofString height)
         let classes := if width.isSome || height.isSome then
           "explicit-size" ++ (cssClass.map (" " ++ ·)).getD "" else cssClass.getD ""
-        return some (← <img key={← JsValue.ofString key} src={← JsValue.ofString url}
-          alt={← JsValue.ofString alt} className={← JsValue.ofString classes} style={imageStyle}/>)
+        return some (← jsx%{<img key={← JsValue.ofString key} src={← JsValue.ofString url}
+          alt={← JsValue.ofString alt} className={← JsValue.ofString classes} style={imageStyle}/>})
       | .leanCode source | .name source =>
         let .ok highlighted := Code.decodeHighlighted source | return none
-        return some (← <code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
-          {VersoCast.Highlighting.render code.highlighting highlighted}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
+          {VersoCast.Highlighting.render code.highlighting highlighted}</code>})
       | .slideCode source =>
         let .ok contents := Code.decode source | return none
-        return some (← <code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
-          {Code.render code "content" contents}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={code.highlighting.inlineCode}>
+          {Code.render code "content" contents}</code>})
       | _ => return none
     renderBlock? := fun key attributes extension children => do
       match extension with
       | .notes =>
         let props ← attributes "notes" styles.blockquote
         Renderer.appendClass props styles.strings.keys.className (← js#" notes")
-        return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
+        return some (← jsx%{<aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>})
       | .fragment style index =>
         let suffix ← JsValue.ofString s!" {fragmentClass style}"
         let index ← index.mapM fun index => JsValue.ofString (toString index)
@@ -117,25 +117,25 @@ def createRenderers (styles : Renderer.Styles)
         let some apply ← prepareAttributes styles fields | return none
         let props ← attributes "wrap" wrapperStyle
         apply props
-        return some (← <div @props={props}>{Js.Array.ofArray (← children.render ())}</div>)
+        return some (← jsx%{<div @props={props}>{Js.Array.ofArray (← children.render ())}</div>})
       | .otherLanguage language code =>
         let props ← attributes "code" styles.codeBlock
-        return some (← <pre @props={props}><code
+        return some (← jsx%{<pre @props={props}><code
           className={← JsValue.ofString s!"language-{language}"}
-          data-language={← JsValue.ofString language}>{ProofWidgets.Html.text code}</code></pre>)
+          data-language={← JsValue.ofString language}>{ProofWidgets.Html.text code}</code></pre>})
       | .leanCode source panel =>
         let .ok highlighted := Code.decodeHighlighted source | return none
         let props ← attributes "lean" code.highlighting.block
         Js.Object.set props (← js#"data-slide-panel-requested") (← JsValue.ofBool panel)
-        return some (← <pre @props={props}><code className={← js#"hl lean block"}>
-          {VersoCast.Highlighting.render code.highlighting highlighted}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code className={← js#"hl lean block"}>
+          {VersoCast.Highlighting.render code.highlighting highlighted}</code></pre>})
       | .slideCode source panel stretch =>
         let .ok contents := Code.decode source | return none
         let props ← attributes "lean" code.highlighting.block
         Js.Object.set props (← js#"data-slide-panel-requested") (← JsValue.ofBool panel)
         if stretch then Renderer.appendClass props styles.strings.keys.className (← js#" r-stretch")
-        return some (← <pre @props={props}><code className={← js#"hl lean block"}>
-          {Code.render code "content" contents}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code className={← js#"hl lean block"}>
+          {Code.render code "content" contents}</code></pre>})
       | .table columns style =>
         -- Preview styles only: unsupported semantic/styling features stay
         -- visible instead of being silently treated as ordinary cells.
@@ -150,6 +150,6 @@ def createRenderers (styles : Renderer.Styles)
       if let some color := metadata.backgroundColor then
         Js.Object.set props (← js#"data-background-color") (← JsValue.ofString color)
         Js.Object.set props styles.strings.keys.style (← js%{ "backgroundColor" := (← JsValue.ofString color) })
-      return some (← <div @props={props}>{renderDefault none}</div>) }
+      return some (← jsx%{<div @props={props}>{renderDefault none}</div>}) }
 
 end VersoCast.Slides

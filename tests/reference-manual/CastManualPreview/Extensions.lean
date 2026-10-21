@@ -46,33 +46,33 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
       if ext.name == `Manual.keywordOf then
         let .ok ((word, _, _, _) : String × Option Lean.Name × Lean.Name × Option String) :=
           Lean.fromJson? ext.data | return none
-        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
-          {ProofWidgets.Html.text word}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text word}</code>})
       else if ext.name == `Manual.keyword then
         let .ok word := ext.data.getStr? | return none
-        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
-          {ProofWidgets.Html.text word}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text word}</code>})
       else if ext.name == `Manual.attr || ext.name == `Manual.attrs then
         let .ok (value : SubVerso.Highlighting.Highlighted) := Lean.fromJson? ext.data | return none
-        return some (← <code key={← JsValue.ofString key} style={highlighting.inlineCode}>
-          {VersoCast.Highlighting.render highlighting value}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={highlighting.inlineCode}>
+          {VersoCast.Highlighting.render highlighting value}</code>})
       else if ext.name == `Manual.syntaxKind then
         let .ok ((_kind, label, _doc) : Lean.Name × String × Option String) :=
           Lean.fromJson? ext.data | return none
         -- Preserve the authored label; no unresolved links or hover protocol.
-        return some (← <code key={← JsValue.ofString key} style={keywordStyle}>
-          {ProofWidgets.Html.text label}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={keywordStyle}>
+          {ProofWidgets.Html.text label}</code>})
       else if ext.name == `Manual.TODO then
         if ext.data != .null then return none
-        return some (← <span key={← JsValue.ofString key} style={highlighting.warning}>
-          <strong>TODO: </strong>{Js.Array.ofArray (← children ())}</span>)
+        return some (← jsx%{<span key={← JsValue.ofString key} style={highlighting.warning}>
+          <strong>TODO: </strong>{Js.Array.ofArray (← children ())}</span>})
       else base.renderInline? key ext children
     renderBlock? := fun key attributes ext children => do
       if ext.name == `Manual.TODO then
         if ext.data != .null then return none
         let props ← attributes "todo" highlighting.warning
-        return some (← <aside @props={props}><strong>TODO: </strong>
-          {Js.Array.ofArray (← children.render ())}</aside>)
+        return some (← jsx%{<aside @props={props}><strong>TODO: </strong>
+          {Js.Array.ofArray (← children.render ())}</aside>})
       else if ext.name == `Manual.proofState then
         let .ok ((_, goals) : Option String × Array
             (SubVerso.Highlighting.Highlighted.Goal SubVerso.Highlighting.Highlighted)) :=
@@ -80,7 +80,7 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
         let text := if goals.isEmpty then "All goals completed! 🐙"
           else "\n\n".intercalate (goals.toList.map (·.toString))
         let props ← attributes "proof-state" styles.codeBlock
-        return some (← <pre @props={props}><code>{ProofWidgets.Html.text text}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code>{ProofWidgets.Html.text text}</code></pre>})
       else if ext.name == `Manual.example then
         -- Raw and traversed forms both have five fields. The tag supplies only
         -- identity above; links are unresolved without reference traversal.
@@ -93,10 +93,10 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
         -- Set the initial browser-owned disclosure state, not React-controlled
         -- state; unchanged attributes preserve user toggles across parent updates.
         if opened then Js.Object.set props (← js#"open") (← JsValue.ofBool true)
-        return some (← <details @props={props}>
+        return some (← jsx%{<details @props={props}>
           <summary @props={summaryProps}>{Js.Array.ofArray title}</summary>
           <div style={styles.part}>{Js.Array.ofArray (← body ())}</div>
-        </details>)
+        </details>})
       else if ext.name == `Manual.syntax then
         let .ok ((_, _, label, _, _) : Option String × Lean.Name × String ×
             Option Lean.Json × Array Lean.Name) := Lean.fromJson? ext.data | return none
@@ -104,22 +104,22 @@ def create (styles : VersoCast.Renderer.Styles) : ReactM
         let (summaryProps, title) ← summary ()
         Js.Object.set summaryProps (← js#"style") summaryStyle
         let props ← attributes "syntax" calloutStyle
-        return some (← <section @props={props}>
+        return some (← jsx%{<section @props={props}>
           <div @props={summaryProps}><span>{ProofWidgets.Html.text label}</span> {Js.Array.ofArray title}</div>
-          {Js.Array.ofArray (← body ())}</section>)
+          {Js.Array.ofArray (← body ())}</section>})
       else if ext.name == `Manual.grammar then
         let .ok ((_, bnf, _) : Lean.Name × Lean.Widget.TaggedText Manual.GrammarTag × Lean.Json) :=
           Lean.fromJson? ext.data | return none
         let props ← attributes "grammar" styles.codeBlock
-        return some (← <pre @props={props}><code>{ProofWidgets.Html.text bnf.stripTags}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code>{ProofWidgets.Html.text bnf.stripTags}</code></pre>})
       else if ext.name == `Manual.figure then
         let .ok (_ : String × Option String × Option Lean.Json) := Lean.fromJson? ext.data | return none
         let some (caption, body) := children.splitParagraph? () | return none
         let (captionProps, title) ← caption ()
         Js.Object.set captionProps (← js#"style") summaryStyle
         let props ← attributes "figure" calloutStyle
-        return some (← <figure @props={props}>{Js.Array.ofArray (← body ())}
-          <figcaption @props={captionProps}>{Js.Array.ofArray title}</figcaption></figure>)
+        return some (← jsx%{<figure @props={props}>{Js.Array.ofArray (← body ())}
+          <figcaption @props={captionProps}>{Js.Array.ofArray title}</figcaption></figure>})
       else base.renderBlock? key attributes ext children }
 
 end CastManualPreview.Extensions

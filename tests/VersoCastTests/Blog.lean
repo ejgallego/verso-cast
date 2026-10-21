@@ -22,8 +22,8 @@ open scoped Lean.Vir.Js Lean.Vir.ProofWidgets.Jsx
           Js.Object.set props (← js#"id") (← JsValue.ofString (idPrefix ++ id))
         Node.createElement (← ElementType.tag (← JsValue.ofString s!"h{level}")) props
           (← Js.Array.ofArray title)
-      return some (← <div key={← JsValue.ofString key}><p data-post-byline="true">
-        {ProofWidgets.Html.text byline}</p>{renderDefault (some header)}</div>) }
+      return some (← jsx%{<div key={← JsValue.ofString key}><p data-post-byline="true">
+        {ProofWidgets.Html.text byline}</p>{renderDefault (some header)}</div>}) }
   FunctionComponent.ofLean fun _ => Renderer.render styles document (renderers := handlers)
 
 /-- The same public adapter works for Page and preserves unsupported children. -/

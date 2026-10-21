@@ -41,7 +41,7 @@ private def renderers : Renderer.Renderers Fixture.genre where
       return some (← Node.fragment props (← Js.Array.empty))
     | .notice =>
       let props ← attributes "notice" (← Renderer.Style.unsupported)
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
+      return some (← jsx%{<aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>})
     | .unsupported | .summary | .table => return none
   renderPart? := fun _key (label : String) _part renderDefault => do
     let header : Renderer.HeaderRenderer := fun level props title => do

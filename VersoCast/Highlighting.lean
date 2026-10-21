@@ -63,8 +63,8 @@ private def tokenStyle (styles : Styles) : Token.Kind → Js Props
 No raw HTML, document lookup, hover protocol, or per-token style construction. -/
 private partial def renderAt (styles : Styles) (key : String) : Highlighted → ReactM (Js Node)
   | .token token =>
-    <span key={← JsValue.ofString key} style={tokenStyle styles token.kind} data-verso-token="true">
-      {ProofWidgets.Html.text token.content}</span>
+    jsx%{<span key={← JsValue.ofString key} style={tokenStyle styles token.kind} data-verso-token="true">
+      {ProofWidgets.Html.text token.content}</span>}
   | .text text | .unparsed text => do Node.text (← JsValue.ofString text)
   | .seq values => do
     let values ← values.mapIdxM fun index => renderAt styles (toString index)
@@ -86,13 +86,13 @@ def renderMessage (styles : Styles) (labelStyle props : Js Props)
     (expandTraces : List Lean.Name := []) : ReactM (Js Node) := do
   let severity := message.severity.toString
   Js.Object.set props (← js#"data-verso-message-severity") (← JsValue.ofString severity)
-  let content ← <pre style={styles.block}><code>
-    {ProofWidgets.Html.text (message.toString expandTraces)}</code></pre>
+  let content ← jsx%{<pre style={styles.block}><code>
+    {ProofWidgets.Html.text (message.toString expandTraces)}</code></pre>}
   if summarize then
-    return ← <details @props={props}><summary style={labelStyle}>
-      {ProofWidgets.Html.text severity}</summary>{pure content}</details>
+    return ← jsx%{<details @props={props}><summary style={labelStyle}>
+      {ProofWidgets.Html.text severity}</summary>{pure content}</details>}
   else
-    return ← <div @props={props}><div style={labelStyle}>
-      {ProofWidgets.Html.text severity}</div>{pure content}</div>
+    return ← jsx%{<div @props={props}><div style={labelStyle}>
+      {ProofWidgets.Html.text severity}</div>{pure content}</div>}
 
 end VersoCast.Highlighting

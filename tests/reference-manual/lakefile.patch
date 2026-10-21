@@ -9,7 +9,7 @@ diff --git a/lakefile.lean b/lakefile.lean
 -require illuminate from git "https://github.com/leanprover/illuminate"@"main"
 -require verso from git "https://github.com/leanprover/verso.git"@"main"
 +require versowebcomponents from git "https://github.com/leanprover/verso-web-components"@
-+  "863b9bd64f83cf9bdc9d7e1daae097572000883b"
++  "7a7ab2299b23a5572b527409c27898b2cd240526"
 +require illuminate from "../../.lake/packages/illuminate"
 +require verso from "../../.lake/packages/verso"
 +require «verso-cast» from "../.."

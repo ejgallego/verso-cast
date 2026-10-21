@@ -2,9 +2,9 @@ import Lake
 open Lake DSL
 
 require verso from git "https://github.com/leanprover/verso" @
-  "01a09f320122475119588526857a07d218aef600"
+  "f7a4dc6867f8df27778b2b320763ec9e3b7be070"
 require lean_vir from git "https://github.com/ejgallego/lean-vir" @
-  "81de859a3ba1cb5da8bc5f128af025dd5a40b343"
+  "5a5614b802e1eb15607b885f84d11cbd8cd4fd21"
 
 package «verso-cast» where
   leanOptions := #[⟨`experimental.module, true⟩]

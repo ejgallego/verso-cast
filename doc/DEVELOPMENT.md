@@ -52,6 +52,9 @@ npm run test:slides
 npm run test:comparison-demo
 ```
 
+Use the shown working directories: Slides image directives resolve local paths
+relative to the compiler process's working directory, not Lake's `-d` argument.
+
 The root, local consumers and reference-manual copy share dependency build
 directories: do not build them concurrently. [CI](../.github/workflows/ci.yml)
 runs the suites sequentially on Ubuntu with build caches disabled.
@@ -72,6 +75,7 @@ Each named test below runs with `npm run <name>`.
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
 | `test:reference-setup` | Reference-manual setup patching |
 | `test:reference-manual` | Six real Manual pages, consumer extensions and widget lifecycle |
+| `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
 Browser tests use real React and Chromium. They check components, not VS Code
 itself, and are correctness tests rather than performance benchmarks.
@@ -115,13 +119,11 @@ it. Restart the Lean server or reopen the file after refreshing runtime assets.
 
 ## Generated document codec acceptance
 
-The isolated codec adoption branch targets Lean 4.35.0 final and VIR PR268.
-Its first gate requires the qualified SDK from source `987a76a5`, whose source
-tree equals landed `81de859a`; the default stable SDK predates this feature.
-Use VIR's standard archive selector:
+The generated codec test uses the SDK from the pinned VIR `v4.36.0-rc1` release.
+VIR's normal Lake acquisition downloads and verifies the matching SDK:
 
 ```sh
-VIR_SDK_ARCHIVE=/path/to/matched/lean-vir-sdk.tar.gz npm run test:json-safe
+npm run test:json-safe
 ```
 
 The test verifies all SDK payload hashes and runs a compiled native writer →
@@ -131,8 +133,9 @@ exact numbers, recursive parts and checked NameMap construction. Rejection,
 recovery and disposal are checked as well. This does not exercise an editor
 connection, rendering, retained React state or performance.
 
-The renderer and examples still need migration from bare JSX to VIR's explicit
-`jsx%{…}` syntax before this dependency update can replace the working demo.
+Native JSX uses the explicit `jsx%{…}` delimiter. The ordinary preview currently
+keeps its existing string decoder; generated-codec widget adoption is separate
+from the typed document gate above.
 
 ## Lean reference manual validation
 

@@ -59,7 +59,7 @@ private def applicationExtensions : Renderer.Renderers Genre.Manual := { content
     else if ext.name == `Test.notice then
       let props ← attributes "notice" (← Renderer.Style.unsupported)
       let childNodes ← children.render ()
-      return some (← <aside @props={props}>{Js.Array.ofArray childNodes}</aside>)
+      return some (← jsx%{<aside @props={props}>{Js.Array.ofArray childNodes}</aside>})
     else return none
 }
 

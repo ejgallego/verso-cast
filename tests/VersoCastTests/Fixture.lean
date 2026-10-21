@@ -2,7 +2,7 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import Verso.Doc.Html
-public import Verso.Output.Html
+public import Lean.Data.Html
 
 public section
 namespace VersoCastTests.Fixture
@@ -28,33 +28,33 @@ instance : TraverseBlock genre := {}
 instance : Html.GenreHtml genre Id where
   inline go extension children := do
     match extension with
-    | .highlight => return .tag "mark" #[] (.seq (← children.mapM go))
+    | .highlight => return .element "mark" #[] (.seq (← children.mapM go))
     | .hidden => return .empty
-    | .unsupported => return .seq (#[.text true "[unsupported inline]"] ++ (← children.mapM go))
+    | .unsupported => return .seq (#[.text "[unsupported inline]"] ++ (← children.mapM go))
   block goInline go extension children := do
     match extension with
-    | .notice => return .tag "aside" #[] (.seq (← children.mapM go))
+    | .notice => return .element "aside" #[] (.seq (← children.mapM go))
     | .hidden => return .empty
-    | .unsupported => return .seq (#[.text true "[unsupported block]"] ++ (← children.mapM go))
+    | .unsupported => return .seq (#[.text "[unsupported block]"] ++ (← children.mapM go))
     | .summary =>
       let some first := children[0]? | return .empty
       let .para title := first | return .empty
-      return .tag "details" #[] (.seq #[
-        .tag "summary" #[] (.seq (← title.mapM goInline)),
-        .tag "div" #[] (.seq (← (children.extract 1 children.size).mapM go))])
+      return .element "details" #[] (.seq #[
+        .element "summary" #[] (.seq (← title.mapM goInline)),
+        .element "div" #[] (.seq (← (children.extract 1 children.size).mapM go))])
     | .table =>
       let #[.ul cells] := children | return .empty
       let cell := fun tag (item : Verso.Doc.ListItem (Block genre)) => do
-        pure (Output.Html.tag tag #[] (.seq (← item.contents.mapM go)))
-      return .tag "table" #[] (.seq #[
-        .tag "thead" #[] (.tag "tr" #[] (.seq (← (cells.extract 0 2).mapM (cell "th")))),
-        .tag "tbody" #[] (.tag "tr" #[] (.seq (← (cells.extract 2 4).mapM (cell "td"))))])
+        pure (Lean.Html.element tag #[] (.seq (← item.contents.mapM go)))
+      return .element "table" #[] (.seq #[
+        .element "thead" #[] (.element "tr" #[] (.seq (← (cells.extract 0 2).mapM (cell "th")))),
+        .element "tbody" #[] (.element "tr" #[] (.seq (← (cells.extract 2 4).mapM (cell "td"))))])
   part go label part := do
     let label : String := label
     let numberText := if label == "root" then "1. " else "1.1. "
-    let header := fun level title => Output.Html.tag s!"h{level}" #[("id", s!"verso-section-{label}")]
-      (.seq #[.text true numberText, title])
-    return .tag "div" #[("data-fixture-section", label)] (← go part header)
+    let header := fun level title => Lean.Html.element s!"h{level}" #[("id", s!"verso-section-{label}")]
+      (.seq #[.text numberText, title])
+    return .element "div" #[("data-fixture-section", label)] (← go part header)
 
 def paragraph (text : String) : Block genre := .para #[.text text]
 
@@ -90,6 +90,6 @@ def standardHtml : String :=
     options := {}, traverseContext := (), traverseState := (),
     definitionIds := {}, linkTargets := {}, codeOptions := {} }
   let rendered := (Html.ToHtml.toHtml document : Html.HtmlT genre Id Output.Html) context {}
-  rendered.1.asString
+  rendered.1.render
 
 end VersoCastTests.Fixture

@@ -14,11 +14,12 @@ lake(["build", "cast-codec-input", "+VersoCastTests.JsonSafe:vir"]);
 const sdkManifest = query("@lean_vir:virSdk");
 const sdk = dirname(sdkManifest);
 const identity = JSON.parse(await readFile(sdkManifest, "utf8"));
-assert.equal(identity.leanToolchain, "leanprover/lean4:v4.35.0");
+assert.equal(identity.leanToolchain, (await readFile(resolve(root, "lean-toolchain"), "utf8")).trim());
 assert.equal(identity.manifestVersion, 13);
 assert.equal(identity.runtimeAbiVersion, 4);
-assert.equal(identity.gitCommit, "987a76a5b8580c5d7f2d1132e7e35b50e01d1b94",
-  "use the SDK qualified against the landed PR268 source tree");
+const lock = JSON.parse(await readFile(resolve(root, "lake-manifest.json"), "utf8"));
+assert.equal(identity.gitCommit, lock.packages.find(pkg => pkg.name === "lean_vir").rev,
+  "the SDK must match the locked VIR source");
 for (const file of identity.files) {
   const bytes = await readFile(resolve(sdk, file.path));
   assert.equal(createHash("sha256").update(bytes).digest("hex"), file.sha256, file.path);

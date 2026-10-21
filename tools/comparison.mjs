@@ -53,7 +53,7 @@ async function prepareCoreComparison() {
       <main><div><h2>Cast → live React</h2><p id="live-status">Loading live view…</p>
         <button id="live-update">Redraw live view</button><div id="live"></div></div>
       <div><h2>Cast → React SSR</h2><div id="cast">${cast}</div></div>
-      <div><h2>Verso → Output.Html.asString</h2><div id="verso">${standard}</div></div></main>
+      <div><h2>Verso → Lean.Html.render</h2><div id="verso">${standard}</div></div></main>
       <script type="module" src="comparison.js"></script>
       </html>`;
     await writeFile(resolve(directory, "index.html"), comparison);
@@ -93,7 +93,7 @@ async function prepareGenreComparison(name) {
       <p>${spec.note} Layout and wrappers may differ; math is source-preserving.</p>
       <main><div><h2>Live Cast</h2><button id="redraw">Redraw</button><div id="live"></div></div>
       <div><h2>Cast SSR</h2><div id="cast">${cast}</div></div>
-      <div><h2>Verso Output.Html.asString</h2><div id="verso">${standard}</div></div></main>
+      <div><h2>Verso Lean.Html.render</h2><div id="verso">${standard}</div></div></main>
       <script type="module" src="comparison.js"></script></body></html>`);
     return { ...spec, directory };
   } finally { runtime.dispose(); }

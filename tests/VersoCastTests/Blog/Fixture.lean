@@ -36,6 +36,6 @@ def standardHtml : IO String := do
   let logger ← Logger.new
   let ((html, _), _) ← ((action context {}).run {}).run {} |>.run logger
   if (← logger.failIfErrors) != 0 then throw (IO.userError "Blog HTML rendering failed")
-  return (Output.Html.seq #[.tag "p" #[("data-post-byline", "true")] (.text true byline), html]).asString
+  return (Output.Html.seq #[.element "p" #[("data-post-byline", "true")] (.text byline), html]).render
 
 end VersoCastTests.Blog
