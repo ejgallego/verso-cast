@@ -5,4 +5,4 @@ import VersoCastTests.JsonSafe
 
 public def main : IO Unit := do
   let part := VersoCastTests.JsonSafe.sample
-  IO.println (VersoCastTests.JsonSafe.encodeDocument part)
+  IO.println (VersoCast.Manual.Codec.encodeDocument part)

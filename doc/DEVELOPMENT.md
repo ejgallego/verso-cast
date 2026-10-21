@@ -74,7 +74,7 @@ Each named test below runs with `npm run <name>`.
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
 | `test:reference-setup` | Reference-manual setup patching |
-| `test:reference-manual` | Six real Manual pages, consumer extensions and widget lifecycle |
+| `test:reference-manual` | Six real Manual pages, generated-codec rendering parity, consumer extensions and widget lifecycle |
 | `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
 Browser tests use real React and Chromium. They check components, not VS Code
@@ -137,6 +137,16 @@ Native JSX uses the explicit `jsx%{…}` delimiter. The ordinary preview current
 keeps its existing string decoder; generated-codec widget adoption is separate
 from the typed document gate above.
 
+The opt-in `VersoCast.Manual.Codec` module supplies
+`VersoCast.Manual.Codec.encodeDocument : Part Manual → String` and registers the
+checked `NameMap String` construction rule. It uses public insertion/iteration
+operations, preserves Name components, rejects invalid keys and keeps the last
+value for duplicate keys. Import it in the writer and typed-entry modules;
+select `argumentRepresentation: "json-safe-v1"` in the receiving public
+`callWith`. Its format is tied to the matched VIR compiler/runtime, not Verso's
+`ToJson` schema or a stable document interchange format. It is not imported by
+the core renderer or the ordinary Manual adapter.
+
 ## Lean reference manual validation
 
 The setup helper creates a pinned copy under `.local/reference-manual`, adds
@@ -175,13 +185,20 @@ React `act` drains test updates; stale-reply checks require a held request to be
 aborted on a page switch and delivered before checking the current page.
 Edits in this replay change serialized input, not the saved Manual source.
 
+The same pages also pass through the generated native writer, a controlled
+JSON-RPC String envelope, JavaScript parsing and public typed `callWith`.
+Their React SSR output must equal that from the existing decoder; Chromium
+checks live output and retained disclosure DOM after typed reconstruction.
+This direct-call gate is separate from the all-Lean widget, which still uses
+its existing decoder pending a public VIR client-side codec connection.
+
 The consumer adapter renders examples, proof states, grammar, attributes,
 syntax-kind labels and TODO notes. It is a raw-document preview: references,
 citations and generated license/index data can remain visible fallbacks.
 Math is source-only and hover information is not interactive. Browser tests
 stage the sample images; VS Code asset-URL mapping is not implemented.
-Debug enables inspection metadata, not timings. The test codec uses Lean's JSON
-parser and is not a renderer performance baseline.
+Debug enables inspection metadata, not timings. Neither decoding path is a
+renderer performance baseline.
 
 Fixtures and the Lake patch live in [tests/reference-manual](../tests/reference-manual).
 Changes to captured renderer bodies must invalidate the widget package; its

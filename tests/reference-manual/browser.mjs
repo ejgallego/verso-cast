@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createVirRuntime } from "lean-vir";
 import { createBrowserHostBindings } from "lean-vir/host-bindings";
 import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+import { openReactRuntime } from "../../tools/browser-runtime.mjs";
 import { pages } from "./pages.mjs";
 
 // Controlled RPC transport only: real Wasm, Lean decoder, Cast, React and DOM.
@@ -11,6 +12,8 @@ const documents = await Promise.all(pages.map(async ({ name }) =>
   (await fetch(`${name}.json`)).text()));
 const staticPages = await Promise.all(pages.map(async ({ name }) =>
   (await fetch(`${name}.ssr.html`)).text()));
+const typedDocuments = await Promise.all(pages.map(async ({ name }) =>
+  (await fetch(`${name}.typed.json`)).json()));
 const showStatic = index => {
   const pane = document.getElementById("ssr");
   if (pane) pane.innerHTML = staticPages[index];
@@ -51,6 +54,7 @@ const runtime = await createVirRuntime({
 });
 const View = runtime.call("CastManualPreview.createComponent");
 const root = createRoot(document.getElementById("app"));
+let typedRuntime;
 let uri = "file:///Manual/Intro.lean";
 const render = () => root.render(React.createElement(View, { pos: { uri, line: 35, character: 0 } }));
 const edit = (target = uri) => {
@@ -77,6 +81,14 @@ const editExample = text => {
   edit();
 };
 window.manualPreview = {
+  // A direct typed-call gate, not a replacement RPC shell. The live all-Lean
+  // widget keeps its current decoder until VIR exposes that composition seam.
+  async renderTyped(index) {
+    if (!pages[index]) throw Error("unknown sample page");
+    typedRuntime ??= await openReactRuntime();
+    await settle(() => root.render(typedRuntime.callWith(
+      { argumentRepresentation: "json-safe-v1" }, "CastManualPreview.renderPart", typedDocuments[index])));
+  },
   get calls() { return calls; },
   get subscriptions() { return handlers.size; },
   get pendingCount() { return pending.length; },
@@ -98,7 +110,10 @@ window.manualPreview = {
     await settle(() => { replies.forEach(reply => reply.resolve()); });
     return replies.length;
   },
-  dispose() { try { root.unmount(); } finally { runtime.dispose(); } },
+  dispose() {
+    try { root.unmount(); }
+    finally { try { typedRuntime?.dispose(); } finally { runtime.dispose(); } }
+  },
 };
 const picker = document.getElementById("sample");
 if (picker) {

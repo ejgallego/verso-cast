@@ -28,8 +28,8 @@ def createMarkedView {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre)
   let styles ← Renderer.Styles.create
   let handlers : Renderer.Renderers genre := {
     renderInline? := fun key _ children => do
-      return some (← <mark key={← JsValue.ofString key}>
-        {Js.Array.ofArray (← children ())}</mark>) }
+      return some (← jsx%{<mark key={← JsValue.ofString key}>
+        {Js.Array.ofArray (← children ())}</mark>}) }
   FunctionComponent.ofLean fun _ =>
     Renderer.render styles document (renderers := handlers)
 ```
@@ -112,6 +112,15 @@ approximate semantic categories; interactive hovers are not implemented.
 `Manual.renderers` is a smaller record that supplies extension names only,
 useful when building your own adapter. The core `VersoCast` import does not
 import Manual.
+
+For an explicit server-to-VIR document boundary, the separate
+`VersoCast.Manual.Codec` import provides `Manual.Codec.encodeDocument` and a
+checked property-map construction rule. Send the encoded String, parse it in
+JavaScript, then pass it to a typed entry with public `callWith` selecting
+`argumentRepresentation: "json-safe-v1"`. This experimental format requires
+the matched VIR compiler/runtime; it is not Verso's `ToJson` schema. See the
+[codec acceptance notes](DEVELOPMENT.md#generated-document-codec-acceptance)
+for coverage and the current all-Lean widget limitation.
 
 Reference-manual-specific examples, proof states, grammar, attribute roles,
 syntax-kind labels and TODO notes belong to the

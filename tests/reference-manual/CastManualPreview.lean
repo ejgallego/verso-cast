@@ -2,6 +2,7 @@
 Author: Emilio J. Gallego Arias -/
 module
 public import VersoCast.Manual
+public import VersoCast.Manual.Codec
 public import CastManualPreview.Extensions
 public import Vir.Infoview
 public import Vir.Infoview.Widget
@@ -128,14 +129,16 @@ private def Page : RuntimeM (FunctionComponent (Props.WithData Input)) := do
       {rendered}
     </section>}
 
-/-- Test-only direct path for React SSR, using the same decoder and renderers as
-the retained widget, without its editor/RPC shell. -/
+/-- Test-only typed path for live React and SSR, using the retained widget's
+renderer without its editor/RPC shell or string decoder. -/
+@[vir_export] def renderPart (document : Verso.Doc.Part Verso.Genre.Manual) : ReactM (Js Node) := do
+  let styles ← VersoCast.Renderer.Styles.create
+  VersoCast.Renderer.render styles document (renderers := (← Extensions.create styles))
+
 @[vir_export] def renderDocument (encoded : String) : ReactM (Js Node) := do
   match decodeDocument encoded with
   | .error error => jsx%{<p role="alert">{ProofWidgets.Html.text error}</p>}
-  | .ok document => do
-    let styles ← VersoCast.Renderer.Styles.create
-    VersoCast.Renderer.render styles document (renderers := (← Extensions.create styles))
+  | .ok document => renderPart document
 
 @[vir_export]
 def View : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do

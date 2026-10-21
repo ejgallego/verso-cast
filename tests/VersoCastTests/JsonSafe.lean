@@ -1,10 +1,7 @@
 /- Copyright (c) 2026 Lean FRO LLC. Released under Apache 2.0 license.
 Author: Emilio J. Gallego Arias -/
 module
-public import VersoManual.Basic
-public import Vir.Package.JsonSafeWriter
-meta import Vir.Compiler.Interface.JsonSafeWriter
-meta import Vir.Compiler.Interface.LibraryAdapters
+public import VersoCast.Manual.Codec
 public meta import Vir.Attributes
 import all MultiVerso.InternalId
 import all VersoManual.Basic
@@ -12,30 +9,6 @@ public section
 
 namespace VersoCastTests.JsonSafe
 open Lean Verso Verso.Doc Verso.Genre.Manual
-
--- Reconstruct through the library's checked insertion API, never raw tree nodes.
--- String components are preserved (including dots/empty strings); duplicate
--- constructor-equal names use NameMap.insert's last-wins semantics.
-def decodeProperties (entries : Array (Name × String)) : Except String (Verso.NameMap String) := do
-  let mut map : Verso.NameMap String := {}
-  for (key, value) in entries do
-    if h : Verso.NameMap.isPublic key then
-      map := map.insert key value h
-    else throw "Manual properties require a nonempty all-string Name chain"
-  return map
-
-def encodeProperties (map : Verso.NameMap String) : Array (Name × String) := Id.run do
-  let mut entries := #[]
-  for (key, value) in map do
-    entries := entries.push (key.toName, value)
-  return entries
-
-run_meta do
-  let .forallE _ wire outcome _ := (← Lean.getConstInfo ``decodeProperties).type
-    | Lean.throwError "unexpected property decoder type"
-  let #[_, source] := outcome.getAppArgs
-    | Lean.throwError "unexpected property decoder result"
-  Vir.Interface.registerClosedLibraryAdapter source wire ``decodeProperties ``encodeProperties
 
 def sample : Part Verso.Genre.Manual := {
   title := #[.text "Typed document λ"]
@@ -53,10 +26,9 @@ def sample : Part Verso.Genre.Manual := {
     id := some ⟨29⟩
     data := .mkObj [("exact", .num ⟨-12345678901234567890123456789000, 37⟩),
       ("nested", .arr #[.null, .bool true, .str "λ\n🦀"])]
-    properties := (decodeProperties #[(.str .anonymous "a.b", "dotted"),
-      (.str (.str .anonymous "a") "b", "first"),
-      (.str .anonymous "", "blank"),
-      (.str (.str .anonymous "a") "b", "last")]).toOption.getD {}
+    properties := Verso.NameMap.ofArray #[(.str .anonymous "a.b", "dotted"),
+      (.str (.str .anonymous "a") "b", "first"), (.str .anonymous "", "blank"),
+      (.str (.str .anonymous "a") "b", "last")]
   } #[.code "#check Nat"]]
   subParts := #[{
     title := #[.text "Child"]
@@ -67,10 +39,6 @@ def sample : Part Verso.Genre.Manual := {
       searchPriority := 0 }
     content := #[]
     subParts := #[] }] }
-
-run_elab do
-  Vir.Interface.JsonSafeWriter.generate
-    `VersoCastTests.JsonSafe.encodeDocument (← Lean.getConstInfo ``sample).type
 
 @[vir_export] def fixture : Part Verso.Genre.Manual := sample
 
@@ -92,7 +60,7 @@ run_elab do
   let .other ext _ := block | return out.push "missing extension"
   let .ok (.num n) := ext.data.getObjVal? "exact" | return out.push "missing number"
   out := out ++ #[n.mantissa.repr, toString n.exponent,
-    toString (encodeProperties ext.properties).size,
+    toString ext.properties.size,
     (ext.properties.get? (.str .anonymous "a.b")).getD "missing",
     (ext.properties.get? (.str (.str .anonymous "a") "b")).getD "missing",
     (ext.properties.get? (.str .anonymous "")).getD "missing"]
