@@ -145,6 +145,9 @@ replacing it or publishing `null`, and stop its execution owners at that same
 boundary. A replacement session gets a new selection; cursor-only renders keep
 the same object. The hook owns a separate request controller and aborts it on
 unmount, including when decoding/rendering fails. Cleanup never calls Wasm.
+Replacing the decoder also starts a new request; an old decoder's pending reply
+cannot become current. A bridge and its opaque snapshots belong to their owning
+runtime: unmount the preview before disposing that runtime.
 Toolbar, status presentation and editor event mapping belong to the host;
 the reference-manual demo illustrates them without making them library policy.
 

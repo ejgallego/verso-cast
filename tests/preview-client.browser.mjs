@@ -2,13 +2,16 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { usePage } from "../js/preview.mjs";
+import { checkEditorOwner } from "./reference-manual/widget.browser.mjs";
+
+window.checkEditorOwner = checkEditorOwner;
 
 const check = (value, message) => { if (!value) throw Error(message); };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 window.checkPreview = async () => {
   const container = document.getElementById("app");
-  let root, selected, state, calls, decoder, failure;
+  let root, selected, state, calls, decoder, failure, onCommit, onRequest;
   const reply = (selection, documentJson = "good") => ({ uri: selection.uri, version: 1,
     snapshotRef: Object.freeze({ __rpcref: 1 }), hasErrors: false, documentJson });
   const makeSelection = () => {
@@ -20,13 +23,19 @@ window.checkPreview = async () => {
         let resolve;
         const promise = new Promise(accept => { resolve = accept; });
         calls.push({ resolve, signal: options.abortSignal });
+        onRequest?.();
         if (failure) throw Error("synchronous setup failure");
         return promise;
       } } };
   };
   function Probe() {
     const result = usePage(selected, decoder);
-    React.useLayoutEffect(() => { state = result; });
+    React.useLayoutEffect(() => {
+      state = result;
+      const callback = onCommit;
+      onCommit = undefined;
+      callback?.();
+    });
     return React.createElement("p", null, result.lastGood?.value ?? result.status.kind);
   }
   const render = () => root.render(React.createElement(React.StrictMode, null, React.createElement(Probe)));
@@ -49,6 +58,29 @@ window.checkPreview = async () => {
   const count = calls.length;
   await settle(render);
   check(calls.length === count, "stable props do not refetch");
+  const ordinaryDecoder = decoder;
+  let obsoleteDecodes = 0;
+  decoder = () => { obsoleteDecodes++; return { ok: true, value: "obsolete decoder" }; };
+  await settle(render);
+  const obsoleteRequest = calls.at(-1);
+  // Resolve during the replacement commit, before passive effect cleanup.
+  // Use normal browser scheduling here: act eagerly drains passive effects.
+  globalThis.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    const requested = new Promise(resolve => { onRequest = () => { onRequest = undefined; resolve(); }; });
+    onCommit = () => {
+      check(!obsoleteRequest.signal.aborted, "response crosses the commit/passive-cleanup gap");
+      obsoleteRequest.resolve(reply(selected));
+    };
+    decoder = ordinaryDecoder;
+    render();
+    await requested;
+  } finally { globalThis.IS_REACT_ACT_ENVIRONMENT = true; }
+  await settle(() => {});
+  check(obsoleteDecodes === 0 && !state.matchesSelection && state.lastGood.value === "good",
+    "decoder-only replacement rejects the old reply and does not mark old data current");
+  await settle(() => calls.at(-1).resolve(reply(selected)));
+  check(state.matchesSelection, "replacement decoder accepts its own response");
   const old = selected;
   await settle(replace);
   check(old.signal.aborted && !state.matchesSelection && state.lastGood.value === "good",

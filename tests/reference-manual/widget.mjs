@@ -18,7 +18,7 @@ function PageAtUri({ uri, decode, view }) {
   const owner = React.useRef(null);
   const [processing, setProcessing] = React.useState(false);
   const [version, setVersion] = React.useState(undefined);
-  const [restart, setRestart] = React.useState(0);
+  const [refresh, setRefresh] = React.useState(0);
   const [stopped, setStopped] = React.useState(false);
   const [selection, setSelection] = React.useState(null);
   const invalidate = () => {
@@ -26,7 +26,7 @@ function PageAtUri({ uri, decode, view }) {
     setSelection(null);
   };
   useClientNotificationEffect("textDocument/didChange", event => {
-    if (event.textDocument.uri !== uri) return;
+    if (event.textDocument.uri !== uri || event.contentChanges.length === 0) return;
     invalidate();
     setVersion(event.textDocument.version);
     setProcessing(true);
@@ -34,13 +34,18 @@ function PageAtUri({ uri, decode, view }) {
   useServerNotificationEffect("$/lean/fileProgress", event => {
     if (event.textDocument.uri !== uri) return;
     const busy = event.processing.length > 0;
-    if (busy) invalidate();
+    if (busy && owner.current && !owner.current.signal.aborted) {
+      invalidate();
+      // Preserve the invalidation even when React batches busy + finished back
+      // to processing=false. Repeated busy notifications do not refresh again.
+      setRefresh(value => value + 1);
+    }
     setProcessing(busy);
   }, [uri]);
   useEvent(editor.events.serverStopped, () => { invalidate(); setStopped(true); }, [uri]);
   useEvent(editor.events.serverRestarted, () => {
     invalidate(); setStopped(false); setProcessing(false); setVersion(undefined);
-    setRestart(value => value + 1);
+    setRefresh(value => value + 1);
   }, [uri]);
   React.useLayoutEffect(() => {
     if (processing || stopped) return;
@@ -48,7 +53,7 @@ function PageAtUri({ uri, decode, view }) {
     owner.current = controller;
     setSelection(Object.freeze({ session, uri, expectedVersion: version, signal: controller.signal }));
     return () => { controller.abort(); owner.current = null; };
-  }, [session, uri, version, processing, stopped, restart]);
+  }, [session, uri, version, processing, stopped, refresh]);
   return React.createElement(PreviewPanel, { selection, decode, view });
 }
 

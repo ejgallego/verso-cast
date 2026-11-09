@@ -76,9 +76,9 @@ Each named test below runs with `npm run <name>`.
 | `test:identity`, `test:navigation` | Retained state, focus addresses and change markers |
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
-| `test:reference-setup` | Reference-manual setup patching |
+| `test:reference-setup` | Reference-manual patching, edit-protection preflight and idempotent recovery |
 | `test:preview-server` | Actual Lean LSP/RPC references, version guards, same-version worker restart and error admission |
-| `test:preview-client` | Native React StrictMode, reentrant/stale replies, setup rollback and cleanup after fatal failure |
+| `test:preview-client` | Native React StrictMode, decoder replacement, stale replies, batched editor progress and cleanup |
 | `test:reference-manual` | Six real Manual pages, generated-codec rendering parity, consumer extensions and widget lifecycle |
 | `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
@@ -157,8 +157,8 @@ the core renderer or the ordinary Manual adapter.
 The setup helper creates a pinned copy under `.local/reference-manual`, adds
 the test widget to document pages and shares Cast's checked dependency revisions.
 Its source pin is defined in [the helper](../tools/setup-reference-manual.mjs).
-It preserves page edits and refuses to overwrite edited configuration or helper
-files. First setup needs network access.
+It preserves page edits and preflights configuration and helper edits before
+applying a managed refresh. First setup needs network access.
 
 For an editor preview:
 
@@ -235,12 +235,16 @@ responsibility:
 - `Manual.lean`, `Blog.lean` and `Highlighting.lean` implement genre adapters and
   shared token rendering. The optional Slides adapter lives in `packages/slides/`.
 - `Manual/Preview.lean` and `Manual/Preview/Server.lean` are the opt-in checked-page
-  Lean bridge and server API; `js/preview.mjs` owns native React requests. The core renderer and ordinary Manual adapter do not
-  import them. `Manual/Codec.lean` is independent of preview acquisition.
-- `js/katex.mjs` is the optional math component. `examples/` contains small
-  clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages
-  and serves demos. `tools/comparison.mjs` prepares the shared comparison views;
-  tests add assertions and browser interaction separately.
+  Lean bridge and server API. The core renderer and ordinary Manual adapter do
+  not import them. `Manual/Codec.lean` is independent of preview acquisition.
+- `js/preview.mjs` owns native React requests and cancellation, not document
+  decoding or rendering. `js/katex.mjs` is the optional native math component.
+- `tests/reference-manual/widget.mjs` maps Infoview events to selected pages;
+  `panel.mjs` supplies demo-only chrome. Other test `.mjs` files drive Node or
+  browser checks. `.mjs` denotes JavaScript ES modules, not another renderer.
+- `examples/` contains small clients; `tools/` stages and serves demos.
+  `tools/comparison.mjs` prepares the shared comparison views; tests add
+  assertions and browser interaction separately.
 
 Keep genre-specific editor behavior in consumers. New renderer behavior should
 have Lean or runtime tests as appropriate; stateful changes need retained React

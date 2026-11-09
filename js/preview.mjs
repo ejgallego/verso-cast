@@ -8,20 +8,20 @@ import { createElement, useEffect, useLayoutEffect, useRef, useState } from "rea
  */
 export function usePage(selection, decode) {
   const committed = useRef(null);
-  const [state, setState] = useState({ selection: null, lastGood: null, status: { kind: "idle" } });
+  const [state, setState] = useState({ selection: null, decode: null, lastGood: null, status: { kind: "idle" } });
   useLayoutEffect(() => {
-    committed.current = selection;
+    committed.current = { selection, decode };
     return () => { committed.current = null; };
-  }, [selection]);
+  }, [selection, decode]);
 
   useEffect(() => {
     if (!selection || selection.signal.aborted) return;
     const controller = new AbortController();
     let live = true;
     const current = () => live && !controller.signal.aborted &&
-      !selection.signal.aborted && committed.current === selection;
+      !selection.signal.aborted && committed.current?.selection === selection && committed.current.decode === decode;
     const publish = update => {
-      if (current()) setState(previous => ({ ...update(previous), selection }));
+      if (current()) setState(previous => ({ ...update(previous), selection, decode }));
     };
     const failed = message => publish(previous => ({ ...previous,
       status: { kind: "error", message } }));
@@ -49,21 +49,22 @@ export function usePage(selection, decode) {
       }, () => failed("Could not load this page. Showing the last successful preview, if any."))
         .catch(error => {
           // A thrown decoder/runtime error is not malformed document input.
-          publish(previous => ({ ...previous, fatal: error }));
+          publish(previous => ({ ...previous, status: { kind: "fatal", error } }));
         });
     } catch (error) {
       const selected = current();
       cleanup(); // rollback even when session.call throws before returning a Promise
-      if (selected) setState(previous => ({ ...previous, selection, status: { kind: "error",
+      if (selected) setState(previous => ({ ...previous, selection, decode, status: { kind: "error",
         message: "Could not start the preview request" } }));
     }
     return cleanup;
   }, [selection, decode]);
 
-  if (state.fatal) throw state.fatal;
-  const matchesSelection = !!selection && state.lastGood?.selection === selection &&
-    state.selection === selection && state.status.kind === "ready";
-  const status = !selection ? { kind: "idle" } : state.selection !== selection ? { kind: "loading" } : state.status;
+  const matchesRequest = state.selection === selection && state.decode === decode;
+  if (matchesRequest && state.status.kind === "fatal") throw state.status.error;
+  const matchesSelection = !!selection && !selection.signal.aborted && matchesRequest &&
+    state.lastGood?.selection === selection && state.status.kind === "ready";
+  const status = !selection ? { kind: "idle" } : !matchesRequest ? { kind: "loading" } : state.status;
   return { lastGood: state.lastGood, status, matchesSelection };
 }
 
