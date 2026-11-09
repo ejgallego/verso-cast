@@ -16,6 +16,7 @@
     "react": "^19.2.7"
   },
   "scripts": {
+    "test:preview-server": "node tests/preview-server.mjs",
     "test:json-safe": "node tests/json-safe.mjs",
     "test:git-consumer": "node tests/git-consumer.mjs",
     "test:js-package": "node tests/js-package.mjs",
@@ -45,6 +46,7 @@
     "lean-vir": "file:.lake/packages/lean_vir",
     "playwright": "1.58.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "vscode-jsonrpc": "8.2.1"
   }
 }

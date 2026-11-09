@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, writeFile, access, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, access, readdir, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { pages as samplePages } from "../tests/reference-manual/pages.mjs";
@@ -9,7 +9,7 @@ export const manualRevision = "400f1682df64bc00e485215bfa4398d24c0f220c";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const destination = resolve(root, ".local/reference-manual");
 const fixtures = resolve(root, "tests/reference-manual");
-const sources = ["CastManualPreview.lean", "CastManualPreview/Server.lean",
+const sources = ["CastManualPreview.lean",
   "CastManualPreview/Extensions.lean", "ExportPages.lean"];
 const hash = source => createHash("sha256").update(source).digest("hex");
 const run = (cwd, command, args, capture = false) => execFileSync(command, args, {
@@ -104,6 +104,17 @@ async function setup() {
     await writeFile(resolve(destination, ".git/info/exclude"), "\n/.cast-preview.json\n/.cast-preview/\n/cast-preview/\n/.vir/\n/.beam/\n");
   }
   state.dependencies = dependencies;
+  // Retire only our old, unedited generated helper after its public extraction.
+  const retired = "CastManualPreview/Server.lean";
+  if (state.sources[retired]) {
+    const target = resolve(destination, "cast-preview", retired);
+    if (await exists(target)) {
+      if (hash(await readFile(target)) !== state.sources[retired])
+        throw Error(`Local edits in retired helper ${target}; refusing to remove it`);
+      await unlink(target);
+    }
+    delete state.sources[retired];
+  }
   // Refresh only our generated helper files; never clobber local helper edits.
   for (const source of sources) {
     const target = resolve(destination, "cast-preview", source);

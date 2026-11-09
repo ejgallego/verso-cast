@@ -244,6 +244,38 @@ try {
     console.log(`${sample.module}: ${comparison.fallbacks.length} visible fallbacks; live/SSR PASS`);
     await page.screenshot({ path: resolve(output, `${sample.name}.png`), fullPage: true });
   }
+  await page.evaluate(() => window.manualPreview.usePublicPreview());
+  await heading(pages.at(-1).title).waitFor();
+  assert.equal(await page.evaluate(() => window.manualPreview.referencePreserved), true,
+    "the ordinary RPC snapshot reference is retained by identity, not decoded or cloned");
+  assert.equal(await page.evaluate(() => window.manualPreview.sessionPreserved), true);
+  const beforeStable = await page.evaluate(() => window.manualPreview.calls);
+  await page.evaluate(() => window.manualPreview.renderPublic());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable,
+    "stable public inputs do not refetch on a parent/cursor-only render");
+  const beforeGeneration = await page.evaluate(() => window.manualPreview.lifecycle.length);
+  const sameVersion = await page.evaluate(() => window.manualPreview.loadedPage.version);
+  await page.evaluate(() => window.manualPreview.refreshPublic());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 1,
+    "a supplied same-version processing token triggers exactly one request");
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeGeneration),
+    ["invalidated", "loaded"], "retire old execution authority before accepting a replacement");
+  assert.equal(await page.evaluate(() => window.manualPreview.loadedPage.version), sameVersion);
+  await page.evaluate(() => window.manualPreview.replaceSession());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 2);
+  assert.equal(await page.evaluate(() => window.manualPreview.referencePreserved), true);
+  assert.equal(await page.evaluate(() => window.manualPreview.sessionPreserved), true,
+    "a newly accepted reference retains its own session, not the previous or a cursor session");
+  const beforeEdit = await page.evaluate(() => window.manualPreview.lifecycle.length);
+  await page.evaluate(() => window.manualPreview.hold(true));
+  await page.evaluate(() => window.manualPreview.edit());
+  await page.locator('[data-cast-preview-current="false"]').waitFor();
+  await heading(pages.at(-1).title).waitFor();
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit), ["invalidated"]);
+  await page.evaluate(() => { window.manualPreview.hold(false); return window.manualPreview.release(); });
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit),
+    ["invalidated", "loaded"], "source edit cancellation invalidates once, before the reply");
+  await page.locator('[data-cast-preview-current="true"]').waitFor();
   // The generated path constructs Part directly through the public typed call.
   // Keep it separate from the retained widget's controlled RPC lifecycle gate.
   for (const [index, sample] of pages.entries()) {

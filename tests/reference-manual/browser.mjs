@@ -26,13 +26,16 @@ async function settle(action) {
   try { await React.act(async () => { await action(); }); }
   finally { globalThis.IS_REACT_ACT_ENVIRONMENT = previous; }
 }
-let current = 0, malformed = false, hold = false, pending = [], calls = 0;
+let current = 0, malformed = false, hold = false, pending = [], calls = 0, documentVersion = 1;
+let lastReply;
 const handlers = new Set();
 const session = { call(method, params, options) {
-  if (method !== "CastManualPreview.Server.document" || params.line !== 0 || params.character !== 0)
-    throw Error(`unexpected preview request: ${method}; line=${String(params.line)} (${typeof params.line}); character=${String(params.character)}`);
+  if (method !== "VersoCast.Manual.Preview.Server.document" || Object.keys(params).length)
+    throw Error(`unexpected preview request: ${method}`);
   calls++;
-  const result = malformed ? "not JSON" : documents[current];
+  const result = { uri, version: documentVersion, snapshotRef: Object.freeze({ __rpcref: calls }),
+    documentJson: malformed ? "not JSON" : documents[current] };
+  lastReply = result;
   // Deliberately ignore abort for held replies: the Lean active guard must work.
   if (hold) return new Promise(resolve => pending.push({
     signal: options.abortSignal, resolve: () => resolve(result),
@@ -40,25 +43,32 @@ const session = { call(method, params, options) {
   if (options.abortSignal.aborted) return Promise.reject(Error("aborted"));
   return Promise.resolve(result);
 } };
-const runtime = await createVirRuntime({
-  wasmUrl: new URL("runtime.wasm", location.href).href,
-  irPackageSet: [new Uint8Array(await (await fetch("widget.irpkg")).arrayBuffer())],
-  defaultHostBindings: () => createBrowserHostBindings({
-    reactHostBindings: createBrowserReactHostBindings,
+const hostOptions = {
     infoviewUseRpcSession: () => session,
     infoviewUseClientNotificationEffect: (method, callback, deps) => {
       if (method !== "textDocument/didChange") throw Error("unexpected notification");
       React.useEffect(() => { handlers.add(callback); return () => handlers.delete(callback); }, deps);
     },
+};
+const runtime = await createVirRuntime({
+  wasmUrl: new URL("runtime.wasm", location.href).href,
+  irPackageSet: [new Uint8Array(await (await fetch("widget.irpkg")).arrayBuffer())],
+  defaultHostBindings: () => createBrowserHostBindings({
+    ...hostOptions, reactHostBindings: createBrowserReactHostBindings,
   }),
 });
 const View = runtime.call("CastManualPreview.createComponent");
 const root = createRoot(document.getElementById("app"));
 let typedRuntime;
+let publicPage, publicSession = session, generation = 0, loadedPage;
+const lifecycle = [];
+const renderPublic = () => root.render(React.createElement(publicPage,
+  typedRuntime.call("CastManualPreview.previewProps", publicSession, uri, generation)));
 let uri = "file:///Manual/Intro.lean";
 const render = () => root.render(React.createElement(View, { pos: { uri, line: 35, character: 0 } }));
 const edit = (target = uri) => {
-  for (const handler of handlers) handler({ textDocument: { uri: target } });
+  if (target === uri) documentVersion++;
+  for (const handler of handlers) handler({ textDocument: { uri: target, version: documentVersion } });
 };
 const editExample = text => {
   const document = JSON.parse(documents[0]);
@@ -81,11 +91,25 @@ const editExample = text => {
   edit();
 };
 window.manualPreview = {
+  get loadedPage() { return loadedPage; },
+  get referencePreserved() { return loadedPage?.snapshotRef === lastReply?.snapshotRef; },
+  get sessionPreserved() { return loadedPage?.session === publicSession; },
+  get lifecycle() { return [...lifecycle]; },
+  async usePublicPreview() {
+    typedRuntime ??= await openReactRuntime(hostOptions);
+    publicPage ??= typedRuntime.call("CastManualPreview.previewFactory",
+      () => lifecycle.push("invalidated"),
+      page => { loadedPage = page; lifecycle.push("loaded"); });
+    await settle(renderPublic);
+  },
+  refreshPublic: () => settle(() => { generation++; renderPublic(); }),
+  renderPublic: () => settle(renderPublic),
+  replaceSession: () => settle(() => { publicSession = { ...session }; renderPublic(); }),
   // A direct typed-call gate, not a replacement RPC shell. The live all-Lean
   // widget keeps its current decoder until VIR exposes that composition seam.
   async renderTyped(index) {
     if (!pages[index]) throw Error("unknown sample page");
-    typedRuntime ??= await openReactRuntime();
+    typedRuntime ??= await openReactRuntime(hostOptions);
     await settle(() => root.render(typedRuntime.callWith(
       { argumentRepresentation: "json-safe-v1" }, "CastManualPreview.renderPart", typedDocuments[index])));
   },

@@ -8,6 +8,7 @@ public import VersoCast.Renderer.Table
 public import VersoManual.Table
 public import VersoManual.Docstring
 public import VersoManual.InlineLean.IO
+public import Verso.Code.External.Config
 import VersoManual.Index
 
 public section
@@ -118,6 +119,13 @@ def createRenderers (styles : Renderer.Styles) : ReactM (Renderer.Renderers Vers
         let props ← attributes "example-file" styles.blockquote
         return some (← jsx%{<section @props={props}><strong>{ProofWidgets.Html.text label}</strong>
           {Js.Array.ofArray (← children.render ())}</section>})
+      else if ext.name == `Verso.Genre.Manual.Block.lean then
+        let .ok ((_config, highlighted, _defined) : Verso.Code.External.CodeConfig ×
+            SubVerso.Highlighting.Highlighted × Array (Lean.Name × String)) :=
+          Lean.fromJson? ext.data | return none
+        let highlighted := highlighted.deIndent highlighted.indentation
+        let props ← attributes "lean" highlighting.block
+        return some (← jsx%{<pre @props={props}><code>{Highlighting.render highlighting highlighted}</code></pre>})
       else if ext.name == `Verso.Genre.Manual.InlineLean.Block.lean then
         let .arr #[hl, _, _, _] := ext.data | return none
         let .ok (highlighted : SubVerso.Highlighting.Highlighted) := Lean.fromJson? hl | return none

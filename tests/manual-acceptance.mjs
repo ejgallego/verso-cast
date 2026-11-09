@@ -8,6 +8,11 @@ try {
   const html = renderToStaticMarkup(runtime.call("VersoCastTests.Manual.render"));
   assert.match(html.replace(/<[^>]*>/g, ""), /def x := &quot;&lt;script&gt;&quot;/);
   assert.match(html, /data-verso-token="true"/);
+  assert.match(html, /leanRunSource := 1/);
+  assert.match(html, /leanRunAnchorSource := 2/);
+  assert.equal((html.match(/\[block extension: Verso.Genre.Manual.Block.lean\]/g) ?? []).length, 1,
+    "only the malformed external Lean block falls back");
+  assert.match(html, /malformed external source stays visible/);
   assert.match(html, /--vscode-symbolIcon-keywordForeground/);
   assert.match(html, /--vscode-editor-font-size/);
   assert.match(html, /&lt;inline&gt;/);

@@ -74,6 +74,7 @@ Each named test below runs with `npm run <name>`.
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
 | `test:reference-setup` | Reference-manual setup patching |
+| `test:preview-server` | Actual Lean LSP/RPC checked-page references, version/processing rejection and error recovery |
 | `test:reference-manual` | Six real Manual pages, generated-codec rendering parity, consumer extensions and widget lifecycle |
 | `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
@@ -175,6 +176,7 @@ For the automated replay:
 
 ```sh
 npm run test:reference-manual
+npm run test:preview-server
 ```
 
 This prepares the copy, builds the widget and six pages, and checks live/SSR
@@ -184,6 +186,16 @@ RPC, with a controlled transport rather than a real editor/LSP connection.
 React `act` drains test updates; stale-reply checks require a held request to be
 aborted on a page switch and delivered before checking the current page.
 Edits in this replay change serialized input, not the saved Manual source.
+
+The public preview component is additionally exercised with supplied processing
+tokens and replacement sessions. Its callbacks must invalidate old execution
+authority before accepting a new one, and preserve the exact native RPC reference.
+The separate server test launches a genuine Lean LSP process with unsaved edits:
+it checks reference round-trips, version guards, error-page admission and recovery,
+and rejection from a substituted same-version processing context. That last
+control is not an actual imported-module rebuild. Actual VS Code reprocessing,
+session replacement, cursor-only request suppression and runnable-control
+shutdown remain consumer acceptance gates; do not infer them from this replay.
 
 The same pages also pass through the generated native writer, a controlled
 JSON-RPC String envelope, JavaScript parsing and public typed `callWith`.
@@ -217,6 +229,9 @@ responsibility:
   defines navigation addresses; `JsStrings.lean` caches native property strings.
 - `Manual.lean`, `Blog.lean` and `Highlighting.lean` implement genre adapters and
   shared token rendering. The optional Slides adapter lives in `packages/slides/`.
+- `Manual/Preview.lean` and `Manual/Preview/Server.lean` are the opt-in checked-page
+  component and server API. The core renderer and ordinary Manual adapter do not
+  import them. `Manual/Codec.lean` is independent of preview acquisition.
 - `js/katex.mjs` is the optional math component. `examples/` contains small
   clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages
   and serves demos. `tools/comparison.mjs` prepares the shared comparison views;
