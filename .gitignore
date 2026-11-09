@@ -7,6 +7,10 @@
 /tests/downstream/.lake/
 /tests/downstream/.beam/
 /tests/downstream/lake-manifest.json
+/tests/preview-consumer/.lake/
+/tests/preview-consumer/.beam/
+/tests/preview-consumer/lake-manifest.json
+/tests/preview-consumer/node_modules/
 /tests/slides/.lake/
 /tests/slides/.beam/
 /packages/slides/.lake/

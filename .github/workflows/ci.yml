@@ -54,6 +54,7 @@ jobs:
           npm test
           npm run test:json-safe
           npm run test:preview-server
+          npm run test:preview-client
       - name: Check optional Slides package and public consumer
         run: |
           cd packages/slides

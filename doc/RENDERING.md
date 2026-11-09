@@ -130,49 +130,62 @@ They are not part of the generic Manual adapter. See the
 
 ### Optional checked-page preview
 
-`VersoCast.Manual.Preview` provides `Preview.create`, a stable React component
-factory. Supply its `Preview.Input` through ordinary `Props.WithData`: a
-cursor-independent RPC session, the page URI and a native `generation` token.
-The token must stay stable between processing runs and change on same-version
-reprocessing or session replacement. Mapping those editor events is the host's
-responsibility; the component itself subscribes to text edits. The reference
-demo wrapper does not yet implement the full host invalidation contract.
+`VersoCast.Manual.Preview.create` prepares a Lean decoder and stable React view.
+Compose them with the headless native helpers from `verso-cast/preview`:
+
+```js
+const state = usePage(selection, bridge.decode);
+return renderPage(bridge, state, { debug });
+```
+
+The native host owns an immutable selection `{session, uri, signal,
+expectedVersion?}`. Use a cursor-independent RPC session whose environment
+contains the imported server module. Abort the selection's signal **before**
+replacing it or publishing `null`, and stop its execution owners at that same
+boundary. A replacement session gets a new selection; cursor-only renders keep
+the same object. The hook owns a separate request controller and aborts it on
+unmount, including when decoding/rendering fails. Cleanup never calls Wasm.
+Toolbar, status presentation and editor event mapping belong to the host;
+the reference-manual demo illustrates them without making them library policy.
 
 `Config.createRenderers` runs once with cached styles and returns a function
-from the current `PageInfo` to extension handlers. Create stable extension
+from the displayed `PageInfo` and `matchesSelection : Bool` to extension handlers. Create stable extension
 components in the outer factory; select their current snapshot authority in
 the returned callbacks. `PageInfo.snapshotRef` is the exact native RPC reference;
 send it only through its captured `PageInfo.session`, not a newer cursor session.
 Never stringify, clone or reconstruct that reference, and never use a version
 as a React key.
-`PageInfo.isCurrent` becomes false while last-good content is retained; pass it
+`matchesSelection` becomes false while last-good content is retained; pass it
 to interactive children to disable stale controls without changing their keys.
 It is a local display flag, not a server freshness lease.
 
-`Config.onInvalidated` runs on source-edit cancellation and effect cleanup before
-a replacement request. It must be synchronous and idempotent; use it to stop
-execution owners. Hosts must also stop owners at their reprocessing/session
-event boundary before changing the generation token. `onLoaded` reports a newly
-accepted reply, not a React commit; it must not automatically run an example.
-Bind execution to each rendered child's captured `PageInfo` in its own effect,
-not by retargeting old controls to a global latest reference. Last-good content
+There is no precommit publication callback or stored freshness field.
+Bind execution to each rendered child's captured `PageInfo`, with native effect
+ownership tied to the selection's abort signal, rather than retargeting old
+controls to a global latest reference. Last-good content
 and disclosure state remain visible during loading or failure, but that does
 not grant it current execution authority. Cursor-only renders with unchanged
 inputs do not request the document again.
 
 The optional server API is `VersoCast.Manual.Preview.Server`:
 
-- `withCheckedPage` captures one final snapshot's metadata, environment, options
+- `withPage` captures one final snapshot's metadata, environment, options
   and evaluated `Part Manual`. It waits for checking and diagnostic reporting;
-  errors are rejected unless the caller explicitly opts into `allowErrors`.
-- The `document` RPC returns `{uri, version, snapshotRef, documentJson}` with
-  `snapshotRef : WithRpcRef CheckedPage`. Keep this envelope on the ordinary RPC
+  `hasErrors` is a fact, not a decision about whether an entry may execute.
+- The `document` RPC returns `{uri, version, snapshotRef, documentJson, hasErrors}` with
+  `snapshotRef : WithRpcRef Page`. Keep this envelope on the ordinary RPC
   path; only `documentJson` uses the document codec.
-- Consumer RPCs call `requireCurrent ref.val` before and after costly work.
-  It checks URI/version, request cancellation and the retained processing-run
-  identity, including same-version replacement. The server compares retained
-  snapshot/reporter identities conservatively; no pointer is exposed on the wire.
-  Lean's session-scoped reference decoder additionally owns reference validity.
+- Consumer RPCs call `requireMatchingVersion ref.val` before and after costly
+  work. It checks URI/version and explicit/edit cancellation against that
+  request's context. Lean's session-scoped reference decoder owns reference
+  validity. `requireErrorFree` additionally offers whole-page execution admission;
+  a recovered document remains available to preview independently.
+
+On the pinned Lean worker, edits advance document versions; closing/reopening
+the file or reloading imports replaces the worker and retires its RPC sessions.
+No scheduler pointers, processing trees or client-supplied generation stamps
+are retained. Custom same-version reprocessing *within* one RPC session is not
+covered; supporting it would require an explicit upstream lifecycle token.
 
 There is no global snapshot registry, document traversal or arbitrary entry
 execution endpoint. Consumers own runnable-entry admission and independent

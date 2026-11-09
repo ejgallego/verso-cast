@@ -244,7 +244,6 @@ try {
     console.log(`${sample.module}: ${comparison.fallbacks.length} visible fallbacks; live/SSR PASS`);
     await page.screenshot({ path: resolve(output, `${sample.name}.png`), fullPage: true });
   }
-  await page.evaluate(() => window.manualPreview.usePublicPreview());
   await heading(pages.at(-1).title).waitFor();
   assert.equal(await page.evaluate(() => window.manualPreview.referencePreserved), true,
     "the ordinary RPC snapshot reference is retained by identity, not decoded or cloned");
@@ -253,13 +252,13 @@ try {
   await page.evaluate(() => window.manualPreview.renderPublic());
   assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable,
     "stable public inputs do not refetch on a parent/cursor-only render");
-  const beforeGeneration = await page.evaluate(() => window.manualPreview.lifecycle.length);
+  const beforeReplacement = await page.evaluate(() => window.manualPreview.lifecycle.length);
   const sameVersion = await page.evaluate(() => window.manualPreview.loadedPage.version);
   await page.evaluate(() => window.manualPreview.refreshPublic());
   assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 1,
-    "a supplied same-version processing token triggers exactly one request");
-  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeGeneration),
-    ["invalidated", "loaded"], "retire old execution authority before accepting a replacement");
+    "a host-owned replacement selection triggers exactly one request");
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeReplacement),
+    ["invalidated", "committed"], "abort the old selection before committing a replacement");
   assert.equal(await page.evaluate(() => window.manualPreview.loadedPage.version), sameVersion);
   await page.evaluate(() => window.manualPreview.replaceSession());
   assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 2);
@@ -274,7 +273,7 @@ try {
   assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit), ["invalidated"]);
   await page.evaluate(() => { window.manualPreview.hold(false); return window.manualPreview.release(); });
   assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit),
-    ["invalidated", "loaded"], "source edit cancellation invalidates once, before the reply");
+    ["invalidated", "committed"], "source edit cancellation invalidates once, before the reply");
   await page.locator('[data-cast-preview-current="true"]').waitFor();
   // The generated path constructs Part directly through the public typed call.
   // Keep it separate from the retained widget's controlled RPC lifecycle gate.
@@ -295,7 +294,7 @@ try {
   await writeFile(resolve(output, "coverage.json"), JSON.stringify(inventory, null, 2) + "\n");
   await page.evaluate(() => window.manualPreview.dispose());
   assert.equal(await page.locator("#app").textContent(), "");
-  assert.equal(await page.evaluate(() => window.manualPreview.subscriptions), 0);
+  assert.equal(await page.evaluate(() => window.manualPreview.activeRequest), false);
   await assert.rejects(page.evaluate(() => window.manualPreview.renderTyped(0)), /disposed/i);
   assert.deepEqual(errors, []);
   console.log("Real Manual pages / Chromium: decode, render, switching, refresh, stale/error recovery and disposal PASS");

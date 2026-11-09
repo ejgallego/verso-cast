@@ -1,7 +1,6 @@
 module
 public import VersoCast.Manual
 public import VersoCast.Blog
-public import VersoCast.Manual.Preview
 
 public section
 namespace Consumer
@@ -27,13 +26,5 @@ def createPostView (document : Doc.Part Genre.Blog.Post) :
   let styles ← Renderer.Styles.create
   let handlers ← Blog.createRenderers Genre.Blog.Post styles
   FunctionComponent.ofLean fun _ => Renderer.render styles document (renderers := handlers)
-
--- Preview and snapshot authority are optional public imports, not test internals.
-def createCheckedManualPreview := Manual.Preview.create
-
-meta def validateCheckedPage
-    (ref : Lean.Server.WithRpcRef Manual.Preview.Server.CheckedPage) : Lean.Server.RequestM Nat := do
-  Manual.Preview.Server.requireCurrent ref.val
-  pure ref.val.meta.version
 
 end Consumer

@@ -1,0 +1,5 @@
+{
+  "name": "cast-preview-consumer",
+  "private": true,
+  "devDependencies": { "esbuild": "0.27.7" }
+}

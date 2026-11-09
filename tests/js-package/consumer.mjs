@@ -3,6 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import katex from "katex";
 import { createMathComponent } from "verso-cast/katex";
+import { usePage, renderPage } from "verso-cast/preview";
+
+assert.equal(typeof usePage, "function");
+assert.equal(renderPage({}, { lastGood: null }), null);
 
 const MathFormula = createMathComponent(katex);
 const html = renderToStaticMarkup(createElement(MathFormula, {

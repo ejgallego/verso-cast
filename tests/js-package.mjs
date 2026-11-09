@@ -17,7 +17,7 @@ try {
   assert.equal(packages.length, 1);
   const [packed] = packages;
   assert.deepEqual(packed.files.map(file => file.path).sort(),
-    ["LICENSE", "ORIGIN.md", "README.md", "js/katex.mjs", "package.json"]);
+    ["LICENSE", "ORIGIN.md", "README.md", "js/katex.mjs", "js/preview.mjs", "package.json"]);
   assert.equal(packed.filename, basename(packed.filename));
   const installed = resolve(temporary, "node_modules/verso-cast");
   await mkdir(installed, { recursive: true });

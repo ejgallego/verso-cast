@@ -36,9 +36,12 @@ For fresh Git consumers of committed `HEAD`, rather than working-tree edits:
 npm run test:git-consumer
 ```
 
-This gate needs only Node, Git and Lean, so it can run before `npm ci`. It checks
-core, Manual/Page/Post factories and Slides-subdirectory consumption, dependency
-pins and public APIs in temporary checkouts. The directories are removed on success or failure.
+This gate can run before root `npm ci`. It checks core, Manual/Page/Post factories,
+Slides-subdirectory consumption and the optional Preview API in temporary Git
+checkouts. Core and Slides need only Node, Git and Lean. The Preview consumer
+explicitly runs its own locked `npm ci`: VIR's optional Infoview bundle needs
+esbuild. It cannot accidentally use tooling from the source checkout.
+Dependency pins are checked and temporary directories removed on success or failure.
 The JS package test separately extracts an npm tarball and imports its KaTeX
 helper from an external consumer, reusing installed test dependencies.
 Neither test publishes a package.
@@ -74,7 +77,8 @@ Each named test below runs with `npm run <name>`.
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
 | `test:reference-setup` | Reference-manual setup patching |
-| `test:preview-server` | Actual Lean LSP/RPC checked-page references, version/processing rejection and error recovery |
+| `test:preview-server` | Actual Lean LSP/RPC references, version guards, same-version worker restart and error admission |
+| `test:preview-client` | Native React StrictMode, reentrant/stale replies, setup rollback and cleanup after fatal failure |
 | `test:reference-manual` | Six real Manual pages, generated-codec rendering parity, consumer extensions and widget lifecycle |
 | `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
@@ -187,15 +191,16 @@ React `act` drains test updates; stale-reply checks require a held request to be
 aborted on a page switch and delivered before checking the current page.
 Edits in this replay change serialized input, not the saved Manual source.
 
-The public preview component is additionally exercised with supplied processing
-tokens and replacement sessions. Its callbacks must invalidate old execution
-authority before accepting a new one, and preserve the exact native RPC reference.
+The public headless hook is exercised with host-owned abort signals and replacement
+sessions. It preserves the exact native RPC reference and captured session;
+tests observe committed React state, not a precommit publication callback.
 The separate server test launches a genuine Lean LSP process with unsaved edits:
-it checks reference round-trips, version guards, error-page admission and recovery,
-and rejection from a substituted same-version processing context. That last
-control is not an actual imported-module rebuild. Actual VS Code reprocessing,
-session replacement, cursor-only request suppression and runnable-control
-shutdown remain consumer acceptance gates; do not infer them from this replay.
+it checks reference round-trips, a stable header RPC anchor, version guards,
+error-page preview versus execution admission, and a real same-version close/open
+worker replacement retiring the old session. The demo's native editor wrapper
+maps edits, progress and server lifecycle events to selection invalidation.
+Actual VS Code lifecycle and runnable-control shutdown remain consumer acceptance
+gates; do not infer them from a controlled browser transport.
 
 The same pages also pass through the generated native writer, a controlled
 JSON-RPC String envelope, JavaScript parsing and public typed `callWith`.
@@ -230,7 +235,7 @@ responsibility:
 - `Manual.lean`, `Blog.lean` and `Highlighting.lean` implement genre adapters and
   shared token rendering. The optional Slides adapter lives in `packages/slides/`.
 - `Manual/Preview.lean` and `Manual/Preview/Server.lean` are the opt-in checked-page
-  component and server API. The core renderer and ordinary Manual adapter do not
+  Lean bridge and server API; `js/preview.mjs` owns native React requests. The core renderer and ordinary Manual adapter do not
   import them. `Manual/Codec.lean` is independent of preview acquisition.
 - `js/katex.mjs` is the optional math component. `examples/` contains small
   clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages

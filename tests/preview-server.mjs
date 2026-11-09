@@ -45,27 +45,42 @@ try {
   assert.equal(first.version, 1);
   assert.equal(typeof first.documentJson, "string");
   assert.ok(Object.hasOwn(first.snapshotRef, "__rpcref"), "native RPC reference, not a stringified handle");
+  const anchored = await connection.sendRequest("$/lean/rpc/call", {
+    textDocument: { uri }, position: { line: 0, character: 0 }, sessionId,
+    method: "VersoCast.Manual.Preview.Server.document", params: { expectedVersion: 1 },
+  });
+  assert.equal(anchored.documentJson, first.documentJson, "imported RPC works at a stable header anchor");
   const query = { snapshotRef: first.snapshotRef };
   assert.equal(await rpc(sessionId, "PreviewServerProbe.title", query), "Preview original");
-  await assert.rejects(rpc(sessionId, "PreviewServerProbe.reprocessed", query),
-    error => error.code === -32801,
-    "a different processing run must fail even at the same URI/version");
   await assert.rejects(document({ expectedVersion: 2 }), error => error.code === -32801);
   await change(2, original.replace("Preview original", "Preview edited"));
   await assert.rejects(rpc(sessionId, "PreviewServerProbe.title", query), error => error.code === -32801);
   const second = await document({ expectedVersion: 2 });
   assert.equal(await rpc(sessionId, "PreviewServerProbe.title", { snapshotRef: second.snapshotRef }), "Preview edited");
   await change(3, original.replace("#doc (Manual)", "#check cast_missing_declaration\n\n#doc (Manual)"));
-  await assert.rejects(document({ expectedVersion: 3 }), /errors/);
-  assert.equal(await rpc(sessionId, "PreviewServerProbe.allowErrors", {}), true,
-    "previewing an error page requires explicit server-side opt-in");
+  const erroneous = await document({ expectedVersion: 3 });
+  assert.equal(erroneous.hasErrors, true, "a recovered page remains available to preview");
+  assert.equal(await rpc(sessionId, "PreviewServerProbe.title", { snapshotRef: erroneous.snapshotRef }), "Preview original");
+  await assert.rejects(rpc(sessionId, "PreviewServerProbe.admit", { snapshotRef: erroneous.snapshotRef }), /errors/);
   await change(4, original);
   const recovered = await document({ expectedVersion: 4 });
   assert.equal(await rpc(sessionId, "PreviewServerProbe.title", { snapshotRef: recovered.snapshotRef }), "Preview original");
   const other = await connection.sendRequest("$/lean/rpc/connect", { uri });
   await assert.rejects(rpc(other.sessionId, "PreviewServerProbe.title", { snapshotRef: recovered.snapshotRef }),
     error => error.code === -32602 && /RPC reference/i.test(error.message));
-  console.log("Native LSP/RPC: checked page, opaque reference roundtrip, stale processing/version, error admission and recovery PASS");
+  // A genuine same-version worker replacement, not a substituted scheduler task.
+  await connection.sendNotification("textDocument/didClose", { textDocument: { uri } });
+  await connection.sendNotification("textDocument/didOpen", {
+    textDocument: { uri, languageId: "lean", version: 4, text: original },
+  });
+  await wait(4);
+  await assert.rejects(rpc(sessionId, "PreviewServerProbe.title", { snapshotRef: recovered.snapshotRef }),
+    error => error.code === -32900, "old RPC session must retire after a same-version restart");
+  const replacement = await connection.sendRequest("$/lean/rpc/connect", { uri });
+  assert.notEqual(replacement.sessionId, sessionId);
+  const fresh = await rpc(replacement.sessionId, "VersoCast.Manual.Preview.Server.document", { expectedVersion: 4 });
+  assert.equal(await rpc(replacement.sessionId, "PreviewServerProbe.admit", { snapshotRef: fresh.snapshotRef }), "Preview original");
+  console.log("Native LSP/RPC: version guards, real same-version worker restart, preview/error admission and recovery PASS");
 } finally {
   clearTimeout(deadline);
   const exited = child.exitCode === null && child.signalCode === null ? once(child, "exit") : Promise.resolve();

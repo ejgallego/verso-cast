@@ -37,43 +37,45 @@ renderer without its editor/RPC shell or string decoder. -/
   | .ok document => renderPart document
 
 -- Public component contract exercised without the editor wrapper below.
-@[vir_export] def previewFactory (invalidated : Js.Function0 Unit)
-    (loaded : Js.Function1 Js.Any Unit) :=
+@[vir_export] def previewFactory :=
   VersoCast.Manual.Preview.create {
     createRenderers := fun styles => do
       let handlers ← Extensions.create styles
-      pure fun _ => handlers
-    onInvalidated := Js.Function.call0Void invalidated
-    onLoaded := fun page => do
-      let metadata ← js%{ "session" := page.session, "uri" := (← JsValue.ofString page.uri),
-        "version" := (← JsValue.ofFloat page.version.toFloat),
-        "snapshotRef" := page.snapshotRef }
-      Js.Function.callVoid loaded (Js.erase metadata) }
+      pure fun _ _ => handlers }
 
-@[vir_export] def previewProps (session : Js Infoview.RpcSession)
-    (uri : Js String) (generation : Js.Any) := do
-  Props.WithData.make (← LeanRef.toJSL
-    ({ session, uri, generation } : VersoCast.Manual.Preview.Input))
+-- Test-only observation after React commit: verify provenance inside the actual
+-- Lean snapshot, not merely the envelope retained by the native request hook.
+private def previewInfo (value : JSL VersoCast.Manual.Preview.Snapshot) : RuntimeM Js.Object := do
+  let snapshot : VersoCast.Manual.Preview.Snapshot ← LeanRef.fromJSL value
+  let page := snapshot.page
+  js%{ "session" := page.session, "uri" := (← JsValue.ofString page.uri),
+    "version" := (← JsValue.ofFloat page.version.toFloat), "snapshotRef" := page.snapshotRef,
+    "hasErrors" := (← JsValue.ofBool page.hasErrors) }
+
+-- Trusted native function supplied by our registered Widget.Module below.
+-- This changes only the phantom type, not the value or its identity.
+private def pageHost (value : Js.Any) : FunctionComponent Props := by
+  unfold FunctionComponent Js.Function1 Js.Any Js at *
+  exact value
 
 @[vir_export]
 def View : RuntimeM (FunctionComponent Infoview.PanelWidgetProps) := do
-  let page ← VersoCast.Manual.Preview.create {
-    createRenderers := fun styles => do
-      let handlers ← Extensions.create styles
-      pure fun _ => handlers }
-  -- Minimal validation host only: source edits are handled by Preview; this
-  -- wrapper does not yet observe same-version reprocessing/session restart.
-  let generation ← JsValue.ofFloat 0
+  let bridge ← previewFactory
+  let inspect ← Js.Function.ofLean previewInfo
   FunctionComponent.ofLean fun props => do
-    let session ← Infoview.useRpcSession
     let pos ← Infoview.PanelWidgetProps.pos props
     let uri ← Infoview.PanelPosition.uri pos
-    let calculate ← Js.Function.ofLean0 do
-      let input ← Props.WithData.make (← LeanRef.toJSL ({ session, uri, generation := Js.erase generation } : VersoCast.Manual.Preview.Input))
-      Node.functionComponent page input (← Js.Array.empty)
-    Hooks.useMemo calculate (← js#[Js.erase session, Js.erase uri])
+    let host := pageHost (← Js.Object.get props (← js#"pageHost"))
+    let input ← js%{ "uri" := uri, "decode" := bridge.decode, "view" := bridge.view,
+      "inspect" := inspect,
+      "selection" := (← Js.Object.get props (← js#"selection")) }
+    Node.functionComponent host input (← Js.Array.empty)
 
 vir_proof_widget View
+
+@[widget_module] def widget : Lean.Widget.Module where
+  javascript := (include_str "Widget.mjs").replace "__VIR_SHELL__"
+    ("widget_module:hash," ++ toString Lean.Vir.Infoview.widget.javascriptHash.val)
 
 def preparedWidgetProps : Infoview.WidgetProps :=
   { widgetProps with

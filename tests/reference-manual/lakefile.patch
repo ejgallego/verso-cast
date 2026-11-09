@@ -16,13 +16,17 @@ diff --git a/lakefile.lean b/lakefile.lean
 
 
  open Lean System in
-@@ -93,6 +95,11 @@
+@@ -93,6 +95,15 @@
  @[default_target]
  lean_lib Tutorial where
 
 +-- Optional validation widget; Manual pages remain ordinary Verso sources.
++input_file castPreviewWidget where
++  path := "cast-preview/Widget.mjs"
++
 +lean_lib CastManualPreview where
 +  srcDir := "cast-preview"
++  needs := #[castPreviewWidget]
 +  requiresModuleSystem := true
 +
  @[default_target]

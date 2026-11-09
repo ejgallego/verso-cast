@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile, access, readdir, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "esbuild";
 import { pages as samplePages } from "../tests/reference-manual/pages.mjs";
 
 export const manualRevision = "400f1682df64bc00e485215bfa4398d24c0f220c";
@@ -25,7 +26,7 @@ export function patchPage(source) {
   if (source.includes("import CastManualPreview")) throw Error("page already has Cast preview support");
   if (!/^import\s/m.test(source)) throw Error("manual page has no import header");
   return source.replace(/^import\s/m, "import CastManualPreview\nimport ").replace(doc,
-    "show_panel_widgets [local Lean.Vir.Infoview.widget with CastManualPreview.preparedWidgetProps]\n\n#doc (Manual)");
+    "show_panel_widgets [local CastManualPreview.widget with CastManualPreview.preparedWidgetProps]\n\n#doc (Manual)");
 }
 
 async function pages(directory) {
@@ -104,6 +105,23 @@ async function setup() {
     await writeFile(resolve(destination, ".git/info/exclude"), "\n/.cast-preview.json\n/.cast-preview/\n/cast-preview/\n/.vir/\n/.beam/\n");
   }
   state.dependencies = dependencies;
+  // Upgrade only configuration whose previous generated hash was checked above.
+  const configPath = resolve(destination, "lakefile.lean");
+  let config = await readFile(configPath, "utf8");
+  if (!config.includes("input_file castPreviewWidget")) {
+    config = config.replace("lean_lib CastManualPreview where",
+      'input_file castPreviewWidget where\n  path := "cast-preview/Widget.mjs"\n\nlean_lib CastManualPreview where')
+      .replace('srcDir := "cast-preview"', 'srcDir := "cast-preview"\n  needs := #[castPreviewWidget]');
+    await writeFile(configPath, config);
+    state.lakefile = hash(config);
+  }
+  for (const path of await pages(resolve(destination, "Manual"))) {
+    const content = await readFile(path, "utf8");
+    const updated = content.replace(
+      "show_panel_widgets [local Lean.Vir.Infoview.widget with CastManualPreview.preparedWidgetProps]",
+      "show_panel_widgets [local CastManualPreview.widget with CastManualPreview.preparedWidgetProps]");
+    if (updated !== content) await writeFile(path, updated);
+  }
   // Retire only our old, unedited generated helper after its public extraction.
   const retired = "CastManualPreview/Server.lean";
   if (state.sources[retired]) {
@@ -116,9 +134,8 @@ async function setup() {
     delete state.sources[retired];
   }
   // Refresh only our generated helper files; never clobber local helper edits.
-  for (const source of sources) {
+  async function writeHelper(source, content) {
     const target = resolve(destination, "cast-preview", source);
-    const content = await readFile(resolve(fixtures, source));
     if (await exists(target) && hash(await readFile(target)) !== state.sources[source] &&
         hash(await readFile(target)) !== hash(content))
       throw Error(`Local helper edits in ${target}; refusing to overwrite`);
@@ -126,6 +143,12 @@ async function setup() {
     await writeFile(target, content);
     state.sources[source] = hash(content);
   }
+  for (const source of sources)
+    await writeHelper(source, await readFile(resolve(fixtures, source)));
+  const bundle = await build({ absWorkingDir: root,
+    entryPoints: ["tests/reference-manual/widget.mjs"], bundle: true, format: "esm",
+    write: false, external: ["react", "@leanprover/infoview", "__VIR_SHELL__"] });
+  await writeHelper("Widget.mjs", bundle.outputFiles[0].contents);
   await writeFile(marker, JSON.stringify(state, null, 2) + "\n");
   run(root, "lake", ["exe", "cast-assets"]);
   await mkdir(resolve(destination, ".vir"), { recursive: true });
