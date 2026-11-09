@@ -24,10 +24,10 @@ public def Consumer.createView {genre : Verso.Doc.Genre}
   let handlers : Renderer.Renderers genre := {
     renderInline? := fun key _ children => do
       let props ← js%{ "key" := (← JsValue.ofString key) }
-      return some (← <mark @props={props}>{Js.Array.ofArray (← children ())}</mark>)
+      return some (← jsx%{<mark @props={props}>{Js.Array.ofArray (← children ())}</mark>})
     renderBlock? := fun _ attributes _ children => do
       let props ← attributes "consumer-note" styles.unsupported
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
+      return some (← jsx%{<aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>})
     renderPart? := fun _ _ _ renderDefault => do
       let header : Renderer.HeaderRenderer := fun level props title => do
         Node.createElement (← ElementType.tag (← JsValue.ofString s!"h{level}"))

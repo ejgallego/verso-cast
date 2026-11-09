@@ -56,12 +56,12 @@ partial def render (styles : Styles) (key : String) : SlideCode → ReactM (Js N
     let nodes ← parts.mapIdxM fun index part => render styles (toString index) part
     Node.fragment (← js%{ "key" := (← JsValue.ofString key) }) (← Js.Array.ofArray nodes)
   | .tactics _ startPos endPos content =>
-    <span key={← JsValue.ofString key} className={← js#"tactic"}
-      data-tactic-range={← JsValue.ofString s!"{startPos}-{endPos}"}>{render styles "content" content}</span>
+    jsx%{<span key={← JsValue.ofString key} className={← js#"tactic"}
+      data-tactic-range={← JsValue.ofString s!"{startPos}-{endPos}"}>{render styles "content" content}</span>}
   | .span info content =>
-    <span key={← JsValue.ofString key}
+    jsx%{<span key={← JsValue.ofString key}
       className={← JsValue.ofString (if info.isEmpty then "has-info" else "has-info " ++ (severity info).«class»)}>
-      {render styles "content" content}</span>
+      {render styles "content" content}</span>}
   | .fragment wrapper isBlock content => do
     let props ← js%{ "key" := (← JsValue.ofString key),
       "className" := (← JsValue.ofString ("fragment" ++ (wrapper.style.map (" " ++ ·)).getD "")) }
@@ -69,18 +69,18 @@ partial def render (styles : Styles) (key : String) : SlideCode → ReactM (Js N
     if isBlock then
       Js.Object.set props (← js#"style") styles.block
       Js.Object.set props (← js#"data-slide-code-block") (← js#"true")
-    return ← <span @props={props}>{render styles "content" content}</span>
+    return ← jsx%{<span @props={props}>{render styles "content" content}</span>}
   | .click target index => do
     let props ← js%{ "key" := (← JsValue.ofString key), "className" := (← js#"fragment slide-click-only") }
     if let some index := index then Js.Object.set props styles.fragmentIndex (← JsValue.ofString (toString index))
-    return ← <span @props={props}>{render styles "target" target}</span>
+    return ← jsx%{<span @props={props}>{render styles "target" target}</span>}
   | .commandOutput info => do
     let nodes ← info.mapIdxM fun index (kind, message) => do
-      <code key={← JsValue.ofString (toString index)}
+      jsx%{<code key={← JsValue.ofString (toString index)}
         className={← JsValue.ofString ("verso-message " ++ kind.«class»)}
-        style={styles.highlighting.message kind}>{ProofWidgets.Html.text (message.toString [])}</code>
-    return ← <span key={← JsValue.ofString key}
+        style={styles.highlighting.message kind}>{ProofWidgets.Html.text (message.toString [])}</code>}
+    return ← jsx%{<span key={← JsValue.ofString key}
       className={← JsValue.ofString ("command-output " ++ (severity info).«class»)}
-      style={styles.block}>{Js.Array.ofArray nodes}</span>
+      style={styles.block}>{Js.Array.ofArray nodes}</span>}
 
 end VersoCast.Slides.Code

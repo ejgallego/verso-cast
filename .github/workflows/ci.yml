@@ -12,7 +12,8 @@ permissions:
 jobs:
   fresh-checkout:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Cold Git consumers and browser suites run sequentially without build caches.
+    timeout-minutes: 60
     env:
       LAKE_ARTIFACT_CACHE: 'false'
     steps:
@@ -51,6 +52,9 @@ jobs:
           lake build VersoCastExamples
           npm run test:reference-setup
           npm test
+          npm run test:json-safe
+          npm run test:preview-server
+          npm run test:preview-client
       - name: Check optional Slides package and public consumer
         run: |
           cd packages/slides

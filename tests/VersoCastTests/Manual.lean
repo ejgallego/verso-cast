@@ -27,6 +27,13 @@ private def malformed : Block Genre.Manual := .other {
   name := `Verso.Genre.Manual.InlineLean.Block.lean, data := .null
 } #[.code "malformed source stays visible"]
 
+private def externalCode (text : String) : Block Genre.Manual := .other {
+  name := `Verso.Genre.Manual.Block.lean
+  data := toJson (({} : Verso.Code.External.CodeConfig),
+    Highlighted.seq #[.token { content := "def", kind := .keyword none none none }, .text text],
+    (#[] : Array (Name × String)))
+} #[.code "EXTERNAL_CHILD_MUST_NOT_RENDER_TWICE"]
+
 private def table (columns : Nat) : Block Genre.Manual := .other {
   name := `Verso.Genre.Manual.Block.table
   data := toJson (columns, true, (none : Option String), (none : Option Json),
@@ -38,7 +45,10 @@ private def table (columns : Nat) : Block Genre.Manual := .other {
   let styles ← VersoCast.Renderer.Styles.create
   let renderers ← VersoCast.Manual.createRenderers styles
   let doc : Part Genre.Manual := .mk #[] "" none
-    #[code, output .error false, output .warning true, output .info false, malformed,
+    #[code, externalCode " leanRunSource := 1", externalCode " leanRunAnchorSource := 2",
+      .other { name := `Verso.Genre.Manual.Block.lean, data := .null }
+        #[.code "malformed external source stays visible"],
+      output .error false, output .warning true, output .info false, malformed,
       .para #[.other {
         name := `Verso.Genre.Manual.InlineLean.Inline.lean
         data := .arr #[toJson (Highlighted.text "<inline>"), .arr #[]] } #[]],

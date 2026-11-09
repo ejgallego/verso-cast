@@ -40,10 +40,10 @@ def View : RuntimeM (FunctionComponent PanelWidgetProps) := do
       Js.Function.callVoid setter (SetStateAction.ofUpdater toggle)
     let rendered ← VersoCast.Renderer.render styles (document (← JsValue.toBool extra))
       (renderers := VersoCast.Manual.renderers)
-    return ← <div data-testid="cast-demo">
+    return ← jsx%{<div data-testid="cast-demo">
       <label><input type="checkbox" checked={extra} onChange={change}/> Show an extra block</label>
       {pure rendered}
-    </div>
+    </div>}
 
 vir_proof_widget View
 

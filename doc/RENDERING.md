@@ -28,8 +28,8 @@ def createMarkedView {genre : Verso.Doc.Genre} (document : Verso.Doc.Part genre)
   let styles ← Renderer.Styles.create
   let handlers : Renderer.Renderers genre := {
     renderInline? := fun key _ children => do
-      return some (← <mark key={← JsValue.ofString key}>
-        {Js.Array.ofArray (← children ())}</mark>) }
+      return some (← jsx%{<mark key={← JsValue.ofString key}>
+        {Js.Array.ofArray (← children ())}</mark>}) }
   FunctionComponent.ofLean fun _ =>
     Renderer.render styles document (renderers := handlers)
 ```
@@ -113,11 +113,92 @@ approximate semantic categories; interactive hovers are not implemented.
 useful when building your own adapter. The core `VersoCast` import does not
 import Manual.
 
+For an explicit server-to-VIR document boundary, the separate
+`VersoCast.Manual.Codec` import provides `Manual.Codec.encodeDocument` and a
+checked property-map construction rule. Send the encoded String, parse it in
+JavaScript, then pass it to a typed entry with public `callWith` selecting
+`argumentRepresentation: "json-safe-v1"`. This experimental format requires
+the matched VIR compiler/runtime; it is not Verso's `ToJson` schema. See the
+[codec acceptance notes](DEVELOPMENT.md#generated-document-codec-acceptance)
+for coverage and the current all-Lean widget limitation.
+
 Reference-manual-specific examples, proof states, grammar, attribute roles,
 syntax-kind labels and TODO notes belong to the
 [validation consumer](../tests/reference-manual/CastManualPreview/Extensions.lean).
 They are not part of the generic Manual adapter. See the
 [reference-manual setup](DEVELOPMENT.md#lean-reference-manual-validation) to try it.
+
+### Optional checked-page preview
+
+`VersoCast.Manual.Preview.create` prepares a Lean decoder and stable React view.
+Compose them with the headless native helpers from `verso-cast/preview`:
+
+```js
+const state = usePage(selection, bridge.decode);
+return renderPage(bridge, state, { debug });
+```
+
+The native host owns an immutable selection `{session, uri, signal,
+expectedVersion?}`. Use a cursor-independent RPC session whose environment
+contains the imported server module. Abort the selection's signal **before**
+replacing it or publishing `null`, and stop its execution owners at that same
+boundary. A replacement session gets a new selection; cursor-only renders keep
+the same object. The hook owns a separate request controller and aborts it on
+unmount, including when decoding/rendering fails. Cleanup never calls Wasm.
+Replacing the decoder also starts a new request; an old decoder's pending reply
+cannot become current. A bridge and its opaque snapshots belong to their owning
+runtime: unmount the preview before disposing that runtime.
+Toolbar, status presentation and editor event mapping belong to the host;
+the reference-manual demo illustrates them without making them library policy.
+
+`Config.createRenderers` runs once with cached styles and returns a function
+from the displayed `PageInfo` and `matchesSelection : Bool` to extension handlers. Create stable extension
+components in the outer factory; select their current snapshot authority in
+the returned callbacks. `PageInfo.snapshotRef` is the exact native RPC reference;
+send it only through its captured `PageInfo.session`, not a newer cursor session.
+Never stringify, clone or reconstruct that reference, and never use a version
+as a React key.
+`matchesSelection` becomes false while last-good content is retained; pass it
+to interactive children to disable stale controls without changing their keys.
+It is a local display flag, not a server freshness lease.
+
+There is no precommit publication callback or stored freshness field.
+Bind execution to each rendered child's captured `PageInfo`, with native effect
+ownership tied to the selection's abort signal, rather than retargeting old
+controls to a global latest reference. Last-good content
+and disclosure state remain visible during loading or failure, but that does
+not grant it current execution authority. Cursor-only renders with unchanged
+inputs do not request the document again.
+
+The optional server API is `VersoCast.Manual.Preview.Server`:
+
+- `withPage` captures one final snapshot's metadata, environment, options
+  and evaluated `Part Manual`. It waits for checking and diagnostic reporting;
+  `hasErrors` is a fact, not a decision about whether an entry may execute.
+- The `document` RPC returns `{uri, version, snapshotRef, documentJson, hasErrors}` with
+  `snapshotRef : WithRpcRef Page`. Keep this envelope on the ordinary RPC
+  path; only `documentJson` uses the document codec.
+- Consumer RPCs call `requireMatchingVersion ref.val` before and after costly
+  work. It checks URI/version and explicit/edit cancellation against that
+  request's context. Lean's session-scoped reference decoder owns reference
+  validity. `requireErrorFree` additionally offers whole-page execution admission;
+  a recovered document remains available to preview independently.
+
+On the pinned Lean worker, edits advance document versions; closing/reopening
+the file or reloading imports replaces the worker and retires its RPC sessions.
+No scheduler pointers, processing trees or client-supplied generation stamps
+are retained. Custom same-version reprocessing *within* one RPC session is not
+covered; supporting it would require an explicit upstream lifecycle token.
+
+There is no global snapshot registry, document traversal or arbitrary entry
+execution endpoint. Consumers own runnable-entry admission and independent
+signature checks. A successful request is relative to its request context, not
+a lease preventing subsequent edits; cancellation and post-await client guards
+remain necessary. Drop old client references on replacement/unmount and retain
+Lean's normal RPC reference lifecycle.
+
+This API is experimental. See the [validation coverage](DEVELOPMENT.md#lean-reference-manual-validation)
+for native server and controlled browser checks versus remaining editor gates.
 
 For custom code presentation, `VersoCast.Highlighting` renders stored SubVerso
 tokens. Create its styles once and call `Highlighting.render styles value key`.

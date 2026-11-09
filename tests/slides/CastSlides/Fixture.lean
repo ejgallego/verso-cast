@@ -24,6 +24,6 @@ def standardHtml : IO String := do
   let (html, _) ← (renderDocument {} document : Html.HtmlT Slides (BuildLogT IO) Output.Html) context {} |>.run logger
   if (← logger.failIfErrors) != 0 then throw (IO.userError "Slides HTML rendering failed")
   -- The deck shell, including its title/navigation, is client presentation.
-  return (Output.Html.seq #[.tag "h1" #[] (.text true document.titleString), html]).asString
+  return (Output.Html.seq #[.element "h1" #[] (.text document.titleString), html]).render
 
 end CastSlides

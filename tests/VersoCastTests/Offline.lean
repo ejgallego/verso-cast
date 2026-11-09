@@ -30,7 +30,7 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
     | .notice =>
       visits.modify fun (inlines, blocks) => (inlines, blocks + 1)
       let props ← attributes "notice" styles.unsupported
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
+      return some (← jsx%{<aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>})
     | .hidden =>
       let props ← js%{ "key" := (← JsValue.ofString key) }
       return some (← Node.fragment props (← Js.Array.empty))
@@ -39,8 +39,8 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
       let some (summary, body) := children.splitParagraph? () | return none
       let (props, title) ← summary ()
       let wrapper ← attributes "summary" styles.unsupported
-      return some (← <details @props={wrapper}><summary @props={props}>{Js.Array.ofArray title}</summary>
-        <div>{Js.Array.ofArray (← body ())}</div></details>)
+      return some (← jsx%{<details @props={wrapper}><summary @props={props}>{Js.Array.ofArray title}</summary>
+        <div>{Js.Array.ofArray (← body ())}</div></details>})
     | .table =>
       let some cells := children.listItems? () | return none
       return ← Renderer.Table.render tables (← attributes "table" tables.table) 2 true cells
@@ -51,11 +51,11 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
       let title := #[numberText] ++ title
       -- This fixture has two levels. Cast passes the level and fresh heading
       -- attributes; no section traversal is duplicated in this extension.
-      if level == 1 then return ← <h1 @props={props}>{Js.Array.ofArray title}</h1>
-      else return ← <h2 @props={props}>{Js.Array.ofArray title}</h2>
-    return some (← <div key={← JsValue.ofString key} data-fixture-section={← JsValue.ofString metadata}>
+      if level == 1 then return ← jsx%{<h1 @props={props}>{Js.Array.ofArray title}</h1>}
+      else return ← jsx%{<h2 @props={props}>{Js.Array.ofArray title}</h2>}
+    return some (← jsx%{<div key={← JsValue.ofString key} data-fixture-section={← JsValue.ofString metadata}>
       {renderDefault (some header)}
-    </div>)
+    </div>})
 
 @[vir_export] def View (idPrefix : String) : ReactM (FunctionComponent Props) := do
   let styles ← Renderer.Styles.create
@@ -70,15 +70,15 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
     js#let (state, setter) ← Hooks.useState (α := String) initial
     let click ← Js.Function.ofLeanVoid fun (_ : Js SyntheticEvent) =>
       Js.Function.callVoid setter (SetStateAction.ofValue clicked)
-    return ← <mark data-cast-initial={state} onClick={click}
-        title="Click to exercise retained React state">{Props.WithData.children props}</mark>
+    return ← jsx%{<mark data-cast-initial={state} onClick={click}
+        title="Click to exercise retained React state">{Props.WithData.children props}</mark>}
   let handlers := renderers highlight data visits idPrefix styles tables
   FunctionComponent.ofLean fun _ => do
     visits.set (0, 0)
     let rendered ← Renderer.render styles Fixture.document (renderers := handlers)
     let (inlines, blocks) ← visits.get
-    return ← <div data-cast-inline-visits={← JsValue.ofString (toString inlines)}
-        data-cast-block-visits={← JsValue.ofString (toString blocks)}>{pure rendered}</div>
+    return ← jsx%{<div data-cast-inline-visits={← JsValue.ofString (toString inlines)}
+        data-cast-block-visits={← JsValue.ofString (toString blocks)}>{pure rendered}</div>}
 
 /-- Shared frozen style values must be borrowed, never used as mutable props. -/
 @[vir_export] def propsProbe (style : Js Props) : ReactM (Js Node) := do
@@ -94,7 +94,7 @@ private def renderers (highlight : FunctionComponent (Props.WithData Unit))
   let math ← Renderer.renderMath styles "math-key" .inline "x < y"
     (attributes ++ #[Renderer.Attribute.of styles.strings.keys.key (← JsValue.ofString "caller-cannot-override")])
   let display ← Renderer.renderMath styles "display-key" .display "x^2" attributes
-  return ← <div>{pure root}{pure math}{pure display}</div>
+  return ← jsx%{<div>{pure root}{pure math}{pure display}</div>}
 
 /-- Wide extension trees require one dispatch per visited extension. Hidden
 children are not visited; this test uses no hashing/JSON identity capability. -/
@@ -151,7 +151,7 @@ one traversal, fallback/default equivalence and skipped section contents. -/
     focus := some "part-root-heading"
     changedIds := #["part-root-heading"] } handlers
   let events ← events.get
-  return ← <div data-contract-events={← JsValue.ofString (String.intercalate "|" events.toList)}>
-    {pure rendered}</div>
+  return ← jsx%{<div data-contract-events={← JsValue.ofString (String.intercalate "|" events.toList)}>
+    {pure rendered}</div>}
 
 end VersoCastTests.Offline

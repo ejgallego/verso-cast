@@ -10,7 +10,7 @@ Cast works with any Verso genre. You can supply React renderers for your own
 roles, directives and section metadata. Adapters are included for Manual and
 Blog documents, with a separate optional package for Slides.
 
-This is an experimental library, using Lean **4.35.0-rc4**.
+This is an experimental library, using Lean **4.36.0-rc1**.
 
 ## Try it
 

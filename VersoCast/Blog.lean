@@ -48,7 +48,7 @@ def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles
       let props ← js%{ "key" := (← JsValue.ofString s!"token:{index}") }
       if let some category := category then
         Js.Object.set props styles.strings.keys.className (← JsValue.ofString category)
-      return ← <span @props={props}>{ProofWidgets.Html.text text}</span>
+      return ← jsx%{<span @props={props}>{ProofWidgets.Html.text text}</span>}
   return {
     inlineName := fun extension => inlineName (bg.inline_eq ▸ extension)
     blockName := fun extension => blockName (bg.block_eq ▸ extension)
@@ -56,38 +56,38 @@ def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles
       let extension : Genre.Blog.InlineExt := bg.inline_eq ▸ extension
       match extension with
       | .highlightedCode _ highlighted | .customHighlight highlighted =>
-        return some (← <code key={← JsValue.ofString key} style={highlighting.inlineCode}>
-          {Highlighting.render highlighting highlighted}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={highlighting.inlineCode}>
+          {Highlighting.render highlighting highlighted}</code>})
       | .lexedText content =>
-        return some (← <code key={← JsValue.ofString key} style={highlighting.inlineCode}>
-          {Js.Array.ofArray (← lexed content)}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key} style={highlighting.inlineCode}>
+          {Js.Array.ofArray (← lexed content)}</code>})
       | .message message traces =>
-        return some (← <code key={← JsValue.ofString key}>
-          {ProofWidgets.Html.text (message.toString traces)}</code>)
+        return some (← jsx%{<code key={← JsValue.ofString key}>
+          {ProofWidgets.Html.text (message.toString traces)}</code>})
       | .htmlSpan classes =>
-        return some (← <span key={← JsValue.ofString key} className={← JsValue.ofString classes}>
-          {Js.Array.ofArray (← children ())}</span>)
+        return some (← jsx%{<span key={← JsValue.ofString key} className={← JsValue.ofString classes}>
+          {Js.Array.ofArray (← children ())}</span>})
       | _ => return none
     renderBlock? := fun _ attributes extension children => do
       let extension : Genre.Blog.BlockExt := bg.block_eq ▸ extension
       match extension with
       | .highlightedCode _ highlighted =>
         let props ← attributes "lean" highlighting.block
-        return some (← <pre @props={props}><code>{Highlighting.render highlighting highlighted}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code>{Highlighting.render highlighting highlighted}</code></pre>})
       | .lexedText content =>
         let props ← attributes "lexed" highlighting.block
         Js.Object.set props (← js#"data-language") (← JsValue.ofString content.name)
-        return some (← <pre @props={props}><code>{Js.Array.ofArray (← lexed content)}</code></pre>)
+        return some (← jsx%{<pre @props={props}><code>{Js.Array.ofArray (← lexed content)}</code></pre>})
       | .message summarize message traces =>
         let props ← attributes "lean-output" (highlighting.message message.severity)
         return some (← Highlighting.renderMessage highlighting labelStyle props message summarize traces)
       | .htmlDiv classes =>
         let props ← attributes "html-div" styles.part
         Renderer.appendClass props styles.strings.keys.className (← JsValue.ofString s!" {classes}")
-        return some (← <div @props={props}>{Js.Array.ofArray (← children.render ())}</div>)
+        return some (← jsx%{<div @props={props}>{Js.Array.ofArray (← children.render ())}</div>})
       | .docstring _ _ =>
         let props ← attributes "docstring" styles.blockquote
-        return some (← <section @props={props}>{Js.Array.ofArray (← children.render ())}</section>)
+        return some (← jsx%{<section @props={props}>{Js.Array.ofArray (← children.render ())}</section>})
       | .docstringSection level =>
         if level > 5 then return none
         let some (title, body) := children.splitParagraph? () | return none
@@ -99,7 +99,7 @@ def createRenderers (g : Doc.Genre) [bg : BlogGenre g] (styles : Renderer.Styles
         let heading ← Node.createElement
           (← ElementType.tag (← JsValue.ofString s!"h{level + 1}")) headingProps
           (← Js.Array.ofArray inlines)
-        return some (← <section @props={props}>{pure heading}{Js.Array.ofArray (← body ())}</section>)
+        return some (← jsx%{<section @props={props}>{pure heading}{Js.Array.ofArray (← body ())}</section>})
       | _ => return none }
 
 end VersoCast.Blog

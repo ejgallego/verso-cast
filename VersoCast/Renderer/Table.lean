@@ -55,13 +55,13 @@ def render (styles : Styles) (props : Js Props) (columns : Nat) (header : Bool)
       Js.Object.set props styles.styleKey (if isHeader then styles.header else styles.cell)
       if isHeader then
         Js.Object.set props styles.scopeKey styles.column
-        return ← <th @props={props}>{Js.Array.ofArray nodes}</th>
-      else return ← <td @props={props}>{Js.Array.ofArray nodes}</td>
-    return ← <tr key={← JsValue.ofString s!"row:{row}"}>{Js.Array.ofArray nodes}</tr>
+        return ← jsx%{<th @props={props}>{Js.Array.ofArray nodes}</th>}
+      else return ← jsx%{<td @props={props}>{Js.Array.ofArray nodes}</td>}
+    return ← jsx%{<tr key={← JsValue.ofString s!"row:{row}"}>{Js.Array.ofArray nodes}</tr>}
   let head : ReactM (Js.Nullable Node) := if header then do
     let some row := rows[0]? | Js.Nullable.null
-    Js.Nullable.ofJs (← <thead>{pure row}</thead>) else Js.Nullable.null
+    Js.Nullable.ofJs (← jsx%{<thead>{pure row}</thead>}) else Js.Nullable.null
   let body := if header then rows.extract 1 rows.size else rows
-  return some (← <table @props={props}>{head}<tbody>{Js.Array.ofArray body}</tbody></table>)
+  return some (← jsx%{<table @props={props}>{head}<tbody>{Js.Array.ofArray body}</tbody></table>})
 
 end VersoCast.Renderer.Table

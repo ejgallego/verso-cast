@@ -50,10 +50,10 @@ private def document (showNote : Bool) : Doc.Part genre :=
   let handlers : VersoCast.Renderer.Renderers genre := {
     renderInline? := fun key _ children => do
       let props ← js%{ "key" := (← JsValue.ofString key), "style" := badgeStyle }
-      return some (← <span @props={props}>{Js.Array.ofArray (← children ())}</span>)
+      return some (← jsx%{<span @props={props}>{Js.Array.ofArray (← children ())}</span>})
     renderBlock? := fun _key attributes _ children => do
       let props ← attributes "note" noteStyle
-      return some (← <aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>)
+      return some (← jsx%{<aside @props={props}>{Js.Array.ofArray (← children.render ())}</aside>})
     renderPart? := fun _key (label : String) _part renderDefault => do
       let header : VersoCast.Renderer.HeaderRenderer := fun level props title => do
         Js.Object.set props (← JsValue.ofString "id") (← JsValue.ofString s!"showcase-{label}")
@@ -66,10 +66,10 @@ private def document (showNote : Bool) : Doc.Part genre :=
     js#let (showNote, setter) ← Hooks.useState (α := Bool) initial
     let change ← Js.Function.ofLeanVoid fun (_ : Js SyntheticEvent) =>
       Js.Function.callVoid setter (SetStateAction.ofUpdater toggle)
-    return ← <div>
+    return ← jsx%{<div>
       <label><input type="checkbox" checked={showNote} onChange={change}/> Show the callout</label>
       {VersoCast.Renderer.render styles (document (← JsValue.toBool showNote)) (renderers := handlers)}
-    </div>
+    </div>}
 
 vir_proof_widget View
 

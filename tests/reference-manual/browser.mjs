@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import { createVirRuntime } from "lean-vir";
 import { createBrowserHostBindings } from "lean-vir/host-bindings";
 import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+import { openReactRuntime } from "../../tools/browser-runtime.mjs";
 import { pages } from "./pages.mjs";
+import { usePage } from "../../js/preview.mjs";
+import { PanelView } from "./panel.mjs";
 
 // Controlled RPC transport only: real Wasm, Lean decoder, Cast, React and DOM.
 // This tests the client lifecycle, not the actual editor/LSP connection.
@@ -11,6 +14,8 @@ const documents = await Promise.all(pages.map(async ({ name }) =>
   (await fetch(`${name}.json`)).text()));
 const staticPages = await Promise.all(pages.map(async ({ name }) =>
   (await fetch(`${name}.ssr.html`)).text()));
+const typedDocuments = await Promise.all(pages.map(async ({ name }) =>
+  (await fetch(`${name}.typed.json`)).json()));
 const showStatic = index => {
   const pane = document.getElementById("ssr");
   if (pane) pane.innerHTML = staticPages[index];
@@ -23,14 +28,16 @@ async function settle(action) {
   try { await React.act(async () => { await action(); }); }
   finally { globalThis.IS_REACT_ACT_ENVIRONMENT = previous; }
 }
-let current = 0, malformed = false, hold = false, pending = [], calls = 0;
-const handlers = new Set();
+let current = 0, malformed = false, hold = false, pending = [], calls = 0, documentVersion = 1;
+let lastReply;
 const session = { call(method, params, options) {
-  if (method !== "CastManualPreview.Server.document" || params.line !== 0 || params.character !== 0)
-    throw Error(`unexpected preview request: ${method}; line=${String(params.line)} (${typeof params.line}); character=${String(params.character)}`);
+  if (method !== "VersoCast.Manual.Preview.Server.document" || params.expectedVersion !== documentVersion)
+    throw Error(`unexpected preview request: ${method}`);
   calls++;
-  const result = malformed ? "not JSON" : documents[current];
-  // Deliberately ignore abort for held replies: the Lean active guard must work.
+  const result = { uri, version: documentVersion, snapshotRef: Object.freeze({ __rpcref: calls }),
+    documentJson: malformed ? "not JSON" : documents[current], hasErrors: false };
+  lastReply = result;
+  // Deliberately ignore abort for held replies: the native selection guard must work.
   if (hold) return new Promise(resolve => pending.push({
     signal: options.abortSignal, resolve: () => resolve(result),
   }));
@@ -42,19 +49,38 @@ const runtime = await createVirRuntime({
   irPackageSet: [new Uint8Array(await (await fetch("widget.irpkg")).arrayBuffer())],
   defaultHostBindings: () => createBrowserHostBindings({
     reactHostBindings: createBrowserReactHostBindings,
-    infoviewUseRpcSession: () => session,
-    infoviewUseClientNotificationEffect: (method, callback, deps) => {
-      if (method !== "textDocument/didChange") throw Error("unexpected notification");
-      React.useEffect(() => { handlers.add(callback); return () => handlers.delete(callback); }, deps);
-    },
   }),
 });
 const View = runtime.call("CastManualPreview.createComponent");
 const root = createRoot(document.getElementById("app"));
+let typedRuntime;
+let publicSession = session, loadedPage, selection, controller;
+const lifecycle = [];
+// Observe committed state in a test-only layout effect, never a precommit
+// publication callback. Production request and presentation code are unchanged.
+function TestHost({ selection, decode, view, inspect }) {
+  const state = usePage(selection, decode);
+  React.useLayoutEffect(() => {
+    if (!state.matchesSelection) return;
+    loadedPage = inspect(state.lastGood.value);
+    lifecycle.push("committed");
+  }, [state.lastGood, state.matchesSelection, inspect]);
+  return React.createElement(PanelView, { bridge: { view }, state });
+}
 let uri = "file:///Manual/Intro.lean";
-const render = () => root.render(React.createElement(View, { pos: { uri, line: 35, character: 0 } }));
+const render = () => root.render(React.createElement(View,
+  { pos: { uri, line: 35, character: 0 }, pageHost: TestHost, selection }));
+const replaceSelection = () => {
+  if (controller) { controller.abort(); lifecycle.push("invalidated"); }
+  controller = new AbortController();
+  selection = Object.freeze({ session: publicSession, uri, expectedVersion: documentVersion,
+    signal: controller.signal });
+  render();
+};
 const edit = (target = uri) => {
-  for (const handler of handlers) handler({ textDocument: { uri: target } });
+  if (target !== uri) return;
+  documentVersion++;
+  replaceSelection();
 };
 const editExample = text => {
   const document = JSON.parse(documents[0]);
@@ -77,8 +103,23 @@ const editExample = text => {
   edit();
 };
 window.manualPreview = {
+  get loadedPage() { return loadedPage; },
+  get referencePreserved() { return loadedPage?.snapshotRef === lastReply?.snapshotRef; },
+  get sessionPreserved() { return loadedPage?.session === publicSession; },
+  get lifecycle() { return [...lifecycle]; },
+  refreshPublic: () => settle(replaceSelection),
+  renderPublic: () => settle(render),
+  replaceSession: () => settle(() => { publicSession = { ...session }; replaceSelection(); }),
+  // A direct typed-call gate, not a replacement RPC shell. The live all-Lean
+  // widget keeps its current decoder until VIR exposes that composition seam.
+  async renderTyped(index) {
+    if (!pages[index]) throw Error("unknown sample page");
+    typedRuntime ??= await openReactRuntime();
+    await settle(() => root.render(typedRuntime.callWith(
+      { argumentRepresentation: "json-safe-v1" }, "CastManualPreview.renderPart", typedDocuments[index])));
+  },
   get calls() { return calls; },
-  get subscriptions() { return handlers.size; },
+  get activeRequest() { return !!controller && !controller.signal.aborted; },
   get pendingCount() { return pending.length; },
   get abortedCount() { return pending.filter(reply => reply.signal.aborted).length; },
   async select(index) {
@@ -86,7 +127,7 @@ window.manualPreview = {
     current = index; uri = `file:///${pages[index].module.replaceAll(".", "/")}.lean`;
     const picker = document.getElementById("sample");
     if (picker) picker.value = String(index);
-    showStatic(index); await settle(render);
+    showStatic(index); await settle(replaceSelection);
   },
   edit: target => settle(() => edit(target)),
   editExample: text => settle(() => editExample(text)),
@@ -98,7 +139,10 @@ window.manualPreview = {
     await settle(() => { replies.forEach(reply => reply.resolve()); });
     return replies.length;
   },
-  dispose() { try { root.unmount(); } finally { runtime.dispose(); } },
+  dispose() {
+    try { controller.abort(); root.unmount(); }
+    finally { try { typedRuntime?.dispose(); } finally { runtime.dispose(); } }
+  },
 };
 const picker = document.getElementById("sample");
 if (picker) {
@@ -106,4 +150,4 @@ if (picker) {
   picker.addEventListener("change", () => window.manualPreview.select(Number(picker.value)));
 }
 showStatic(0);
-await settle(render);
+await settle(replaceSelection);

@@ -21,7 +21,6 @@ namespace VersoCast.Renderer
 
 open Lean.Vir
 open Lean.Vir.React
-open Lean.Doc.Syntax
 open _root_.Verso
 open Verso.Doc
 open Internal
@@ -110,7 +109,7 @@ def renderMath
   if let some component := component? then
     Js.Object.set props styles.strings.keys.source (← JsValue.ofString source)
     return ← Node.functionComponent component props (← js#[])
-  return ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString source)}</code>
+  return ← jsx%{<code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString source)}</code>}
 
 private partial def renderInline (styles : Styles) (renderers : Renderers g)
     (key : String) : _root_.Verso.Doc.Inline g → ReactM (Lean.Vir.Js Node)
@@ -120,27 +119,27 @@ private partial def renderInline (styles : Styles) (renderers : Renderers g)
       let props ← Js.Object.empty
       Js.Object.set props styles.strings.keys.style style
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
-      return ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString value)}</code>
+      return ← jsx%{<code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString value)}</code>}
   | .math mode value => renderMath styles key mode value #[] renderers.mathComponent?
   | .emph content => do
       let children ← renderInlines styles renderers content
-      return ← <em key={← JsValue.ofString key}>{Js.Array.ofArray children}</em>
+      return ← jsx%{<em key={← JsValue.ofString key}>{Js.Array.ofArray children}</em>}
   | .bold content => do
       let children ← renderInlines styles renderers content
-      return ← <strong key={← JsValue.ofString key}>{Js.Array.ofArray children}</strong>
+      return ← jsx%{<strong key={← JsValue.ofString key}>{Js.Array.ofArray children}</strong>}
   | .link content destination => do
       let children ← renderInlines styles renderers content
-      return ← <a key={← JsValue.ofString key} href={← JsValue.ofString destination}>{Js.Array.ofArray children}</a>
+      return ← jsx%{<a key={← JsValue.ofString key} href={← JsValue.ofString destination}>{Js.Array.ofArray children}</a>}
   | .footnote name content => do
       let label ← Node.text (← JsValue.ofString s!"[{name}]")
-      let label ← <sup key="structural:label">{pure label}</sup>
+      let label ← jsx%{<sup key="structural:label">{pure label}</sup>}
       let children ← renderInlines styles renderers content
       -- Footnotes are inline values: details/summary would make a paragraph
       -- invalid and cause the HTML parser to relocate its children during SSR.
-      return ← <span key={← JsValue.ofString key} className="vir-verso-footnote" role="note">
+      return ← jsx%{<span key={← JsValue.ofString key} className="vir-verso-footnote" role="note">
         {pure label}<span key="structural:body">{Js.Array.ofArray children}</span>
-      </span>
-  | .image alt destination => do return ← <img key={← JsValue.ofString key} src={← JsValue.ofString destination} alt={← JsValue.ofString alt}/>
+      </span>}
+  | .image alt destination => do return ← jsx%{<img key={← JsValue.ofString key} src={← JsValue.ofString destination} alt={← JsValue.ofString alt}/>}
   | .concat content => do
       let props ← Js.Object.empty
       Js.Object.set props styles.strings.keys.key (← JsValue.ofString key)
@@ -155,7 +154,7 @@ private partial def renderInline (styles : Styles) (renderers : Renderers g)
           Js.Object.set props styles.strings.keys.key styles.strings.values.structuralExtension
           Js.Object.set props styles.strings.keys.className styles.strings.values.unsupportedExtensionClass
           Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString (renderers.inlineName extension))
-          let marker ← <code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[inline extension: {renderers.inlineName extension}]")}</code>
+          let marker ← jsx%{<code @props={props}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[inline extension: {renderers.inlineName extension}]")}</code>}
           let fragmentProps ← Js.Object.empty
           Js.Object.set fragmentProps styles.strings.keys.key (← JsValue.ofString key)
           Node.fragment fragmentProps
@@ -181,12 +180,12 @@ private def headingNode
   let props ← blockProps styles debug identity "heading" (styles.heading) changed focused
   if let some header := header? then return ← header (min level 6) props content
   match level with
-  | 1 => <h1 @props={props}>{Js.Array.ofArray content}</h1>
-  | 2 => <h2 @props={props}>{Js.Array.ofArray content}</h2>
-  | 3 => <h3 @props={props}>{Js.Array.ofArray content}</h3>
-  | 4 => <h4 @props={props}>{Js.Array.ofArray content}</h4>
-  | 5 => <h5 @props={props}>{Js.Array.ofArray content}</h5>
-  | _ => <h6 @props={props}>{Js.Array.ofArray content}</h6>
+  | 1 => jsx%{<h1 @props={props}>{Js.Array.ofArray content}</h1>}
+  | 2 => jsx%{<h2 @props={props}>{Js.Array.ofArray content}</h2>}
+  | 3 => jsx%{<h3 @props={props}>{Js.Array.ofArray content}</h3>}
+  | 4 => jsx%{<h4 @props={props}>{Js.Array.ofArray content}</h4>}
+  | 5 => jsx%{<h5 @props={props}>{Js.Array.ofArray content}</h5>}
+  | _ => jsx%{<h6 @props={props}>{Js.Array.ofArray content}</h6>}
 
 private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
     (changedIds : Array String)
@@ -197,32 +196,32 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
   | .para content => do
       let props ← blockProps styles debug identity "paragraph" (styles.paragraph) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← renderInlines styles renderers content
-      return ← <p @props={props}>{Js.Array.ofArray children}</p>
+      return ← jsx%{<p @props={props}>{Js.Array.ofArray children}</p>}
   | .code source => do
       let text ← Node.text (← JsValue.ofString source)
       let codeProps ← Js.Object.empty
       Js.Object.set codeProps styles.strings.keys.dataLanguage styles.strings.values.empty
-      let code ← <code @props={codeProps}>{pure text}</code>
+      let code ← jsx%{<code @props={codeProps}>{pure text}</code>}
       let props ← blockProps styles debug identity "code" (styles.codeBlock) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
-      return ← <pre @props={props}>{pure code}</pre>
+      return ← jsx%{<pre @props={props}>{pure code}</pre>}
   | .ul items => do
       let props ← blockProps styles debug identity "unordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
-      return ← <ul @props={props}>{Js.Array.ofArray children}</ul>
+      return ← jsx%{<ul @props={props}>{Js.Array.ofArray children}</ul>}
   | .ol start items => do
       let props ← blockProps styles debug identity "ordered-list" (styles.list) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       Js.Object.set props styles.strings.keys.start (← JsValue.ofString (toString start))
       let children ← items.mapIdxM fun index item => renderListItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
-      return ← <ol @props={props}>{Js.Array.ofArray children}</ol>
+      return ← jsx%{<ol @props={props}>{Js.Array.ofArray children}</ol>}
   | .dl items => do
       let children ← items.mapIdxM fun index item =>
         renderDescItem styles renderers fingerprint changedIds focus debug identity.semanticKey s!"item:{index}" s!"{identity.debugPath}-item-{index}" item
       let props ← blockProps styles debug identity "description-list" (styles.descriptionList) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
-      return ← <dl @props={props}>{Js.Array.ofArray children.flatten}</dl>
+      return ← jsx%{<dl @props={props}>{Js.Array.ofArray children.flatten}</dl>}
   | .blockquote content => do
       let props ← blockProps styles debug identity "blockquote" (styles.blockquote) (changedIds.contains identity.debugPath) (focus == some identity.debugPath) decorate
       let children ← renderBlocks styles renderers fingerprint changedIds focus debug identity.semanticKey identity.debugPath content
-      return ← <blockquote @props={props}>{Js.Array.ofArray children}</blockquote>
+      return ← jsx%{<blockquote @props={props}>{Js.Array.ofArray children}</blockquote>}
   | .concat content => do
       -- Concatenations are React fragments, not DOM nodes. A source block may
       -- expand to several children; mark those children without adding a wrapper.
@@ -274,11 +273,11 @@ private partial def renderBlock (styles : Styles) (renderers : Renderers g) (fin
           let markerStyle := styles.inlineCode
           let markerProps ← Js.Object.empty
           Js.Object.set markerProps styles.strings.keys.style markerStyle
-          let marker ← <code @props={markerProps}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[block extension: {renderers.blockName extension}]")}</code>
+          let marker ← jsx%{<code @props={markerProps}>{Lean.Vir.React.Node.text (← JsValue.ofString s!"[block extension: {renderers.blockName extension}]")}</code>}
           let props ← attributes "unsupported-extension" (styles.unsupported)
           Js.Object.set props styles.strings.keys.dataVersoExtension (← JsValue.ofString (renderers.blockName extension))
           let childNodes ← children.render ()
-          return ← <div @props={props}>{pure marker}{Js.Array.ofArray childNodes}</div>
+          return ← jsx%{<div @props={props}>{pure marker}{Js.Array.ofArray childNodes}</div>}
 
 where
   renderListItem (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
@@ -292,7 +291,7 @@ where
     let props ← listItemProps styles debug key path "list-item" (styles.listItem) (focus == some path)
     let children ← renderBlocks styles renderers fingerprint changedIds focus debug
       (semanticChild parentSemanticKey "item" key) path content
-    return ← <li @props={props}>{Js.Array.ofArray children}</li>
+    return ← jsx%{<li @props={props}>{Js.Array.ofArray children}</li>}
 
   renderDescItem (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
       (changedIds : Array String)
@@ -310,12 +309,12 @@ where
     let termProps ← listItemProps styles debug s!"{key}:term" termPath "description-term" (styles.descriptionTerm)
       (focus == some path || focus == some termPath)
     let termChildren ← renderInlines styles renderers term
-    let termNode ← <dt @props={termProps}>{Js.Array.ofArray termChildren}</dt>
+    let termNode ← jsx%{<dt @props={termProps}>{Js.Array.ofArray termChildren}</dt>}
     let descriptionProps ← listItemProps styles debug s!"{key}:description" descriptionPath "description-value" (styles.descriptionValue)
       (focus == some path || focus == some descriptionPath)
     let descriptionChildren ← renderBlocks styles renderers fingerprint changedIds focus debug
       (semanticChild parentSemanticKey "description" key) descriptionPath description
-    let descriptionNode ← <dd @props={descriptionProps}>{Js.Array.ofArray descriptionChildren}</dd>
+    let descriptionNode ← jsx%{<dd @props={descriptionProps}>{Js.Array.ofArray descriptionChildren}</dd>}
     pure #[termNode, descriptionNode]
 
   renderBlocks (styles : Styles) (renderers : Renderers g) (fingerprint : Fingerprint.Value g → Option String)
@@ -366,7 +365,7 @@ private partial def renderPart (styles : Styles) (renderers : Renderers g) (fing
     Js.Object.set props styles.strings.keys.dataVersoRenderId (← JsValue.ofString identity.friendlyId)
     Js.Object.set props styles.strings.keys.dataVersoIdentityOrigin (identity.origin.jsLabel styles.strings)
     Js.Object.set props styles.strings.keys.title (← JsValue.ofString s!"render path: {identity.debugPath}\nidentity: {identity.friendlyId} ({identity.origin.label})")
-  return ← <section @props={props}>{pure heading}{Js.Array.ofArray content}{Js.Array.ofArray subParts}</section>
+  return ← jsx%{<section @props={props}>{pure heading}{Js.Array.ofArray content}{Js.Array.ofArray subParts}</section>}
 
 /-- Construct a native React subtree for any Verso genre. No JSON or equality instances are required. -/
 def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})
@@ -380,6 +379,6 @@ def render (styles : Styles) (input : Doc.Part g) (options : Options g := {})
   if options.debug then
     Js.Object.set props styles.strings.keys.dataVersoChangedBlockCount (← JsValue.ofString (toString options.changedIds.size))
     Js.Object.set props styles.strings.keys.dataVersoFocusBlock (← JsValue.ofString (options.focus.getD ""))
-  return ← <article @props={props}>{pure rootPart}</article>
+  return ← jsx%{<article @props={props}>{pure rootPart}</article>}
 
 end VersoCast.Renderer

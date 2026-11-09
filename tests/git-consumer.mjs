@@ -56,6 +56,7 @@ try {
   const coreLock = await checkLock(core, "«verso-cast»");
   assert.ok(!coreLock.packages.some(pkg => pkg.name === "«verso-slides»"), "core does not depend on Slides");
   console.log("Core Git consumer: public API, Manual/Page/Post factories and native identity helpers PASS");
+  await rm(core, { recursive: true, force: true });
 
   const slides = await prepare("slides", "tests/slides", ["CastSlides/PublicApi.lean"],
     'require «verso-cast-slides» from "../../packages/slides"',
@@ -71,6 +72,17 @@ try {
   assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: castDirectory, encoding: "utf8" }).trim(), revision);
   assert.equal(await readFile(resolve(castDirectory, "lean-toolchain"), "utf8"), committed("lean-toolchain"));
   console.log("Slides Git-subdirectory consumer: public API and same-checkout core PASS");
+  await rm(slides, { recursive: true, force: true });
+
+  const preview = await prepare("preview", "tests/preview-consumer",
+    ["PreviewConsumer.lean", "package.json", "package-lock.json"],
+    'require «verso-cast» from "../.."', `require «verso-cast» ${gitSource}`);
+  // This optional API reaches VIR's Infoview bundle. Install its own locked
+  // tool, not tooling found accidentally in the source checkout's ancestors.
+  execFileSync("npm", ["ci"], { cwd: preview, stdio: "inherit" });
+  lake(preview, "build", "PreviewConsumer");
+  await checkLock(preview, "«verso-cast»");
+  console.log("Optional Preview Git consumer: explicit locked bundle tooling and public APIs PASS");
 } finally {
   // Only the directory created by this invocation, including failed builds.
   await rm(temporary, { recursive: true, force: true });

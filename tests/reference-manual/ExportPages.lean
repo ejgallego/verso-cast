@@ -23,11 +23,15 @@ import Verso.Doc.Name
   IO.FS.writeBinFile ".cast-preview/widget.irpkg" bytes
 
 -- Optional browser-validation inputs: actual elaborated pages, before traversal.
+private def exportPage (name : String) (part : Verso.Doc.Part Verso.Genre.Manual) : IO Unit := do
+  IO.FS.writeFile s!".cast-preview/{name}.json" (Lean.toJson part).compress
+  IO.FS.writeFile s!".cast-preview/{name}.typed.json" (VersoCast.Manual.Codec.encodeDocument part)
+
 def main : IO Unit := do
   IO.FS.createDirAll ".cast-preview"
-  IO.FS.writeFile ".cast-preview/intro.json" (Lean.toJson (%doc Manual.Intro)).compress
-  IO.FS.writeFile ".cast-preview/empty.json" (Lean.toJson (%doc Manual.BasicTypes.Empty)).compress
-  IO.FS.writeFile ".cast-preview/products.json" (Lean.toJson (%doc Manual.BasicTypes.Products)).compress
-  IO.FS.writeFile ".cast-preview/int.json" (Lean.toJson (%doc Manual.BasicTypes.Int)).compress
-  IO.FS.writeFile ".cast-preview/monads.json" (Lean.toJson (%doc Manual.Monads.Syntax)).compress
-  IO.FS.writeFile ".cast-preview/structures.json" (Lean.toJson (%doc Manual.Language.InductiveTypes.Structures)).compress
+  exportPage "intro" (%doc Manual.Intro)
+  exportPage "empty" (%doc Manual.BasicTypes.Empty)
+  exportPage "products" (%doc Manual.BasicTypes.Products)
+  exportPage "int" (%doc Manual.BasicTypes.Int)
+  exportPage "monads" (%doc Manual.Monads.Syntax)
+  exportPage "structures" (%doc Manual.Language.InductiveTypes.Structures)

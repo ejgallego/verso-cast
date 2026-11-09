@@ -36,9 +36,12 @@ For fresh Git consumers of committed `HEAD`, rather than working-tree edits:
 npm run test:git-consumer
 ```
 
-This gate needs only Node, Git and Lean, so it can run before `npm ci`. It checks
-core, Manual/Page/Post factories and Slides-subdirectory consumption, dependency
-pins and public APIs in temporary checkouts. The directories are removed on success or failure.
+This gate can run before root `npm ci`. It checks core, Manual/Page/Post factories,
+Slides-subdirectory consumption and the optional Preview API in temporary Git
+checkouts. Core and Slides need only Node, Git and Lean. The Preview consumer
+explicitly runs its own locked `npm ci`: VIR's optional Infoview bundle needs
+esbuild. It cannot accidentally use tooling from the source checkout.
+Dependency pins are checked and temporary directories removed on success or failure.
 The JS package test separately extracts an npm tarball and imports its KaTeX
 helper from an external consumer, reusing installed test dependencies.
 Neither test publishes a package.
@@ -51,6 +54,9 @@ Build the optional Slides package and its consumer sequentially:
 npm run test:slides
 npm run test:comparison-demo
 ```
+
+Use the shown working directories: Slides image directives resolve local paths
+relative to the compiler process's working directory, not Lake's `-d` argument.
 
 The root, local consumers and reference-manual copy share dependency build
 directories: do not build them concurrently. [CI](../.github/workflows/ci.yml)
@@ -70,8 +76,11 @@ Each named test below runs with `npm run <name>`.
 | `test:identity`, `test:navigation` | Retained state, focus addresses and change markers |
 | `test:widget`, `test:showcase` | Component state, callbacks, retained DOM and disposal |
 | `test:math`, `test:manual`, `test:blog`, `test:slides` | Math and genre adapters |
-| `test:reference-setup` | Reference-manual setup patching |
-| `test:reference-manual` | Six real Manual pages, consumer extensions and widget lifecycle |
+| `test:reference-setup` | Reference-manual patching, edit-protection preflight and idempotent recovery |
+| `test:preview-server` | Actual Lean LSP/RPC references, version guards, same-version worker restart and error admission |
+| `test:preview-client` | Native React StrictMode, decoder replacement, stale replies, batched editor progress and cleanup |
+| `test:reference-manual` | Six real Manual pages, generated-codec rendering parity, consumer extensions and widget lifecycle |
+| `test:json-safe` | Generated native writer, matched public SDK, typed Manual observations on both Wasm profiles |
 
 Browser tests use real React and Chromium. They check components, not VS Code
 itself, and are correctness tests rather than performance benchmarks.
@@ -113,13 +122,43 @@ Place the cursor inside `showcase_ready`. The smaller
 cursor anchor. These widgets display math source; the browser math demo typesets
 it. Restart the Lean server or reopen the file after refreshing runtime assets.
 
+## Generated document codec acceptance
+
+The generated codec test uses the SDK from the pinned VIR `v4.36.0-rc1` release.
+VIR's normal Lake acquisition downloads and verifies the matching SDK:
+
+```sh
+npm run test:json-safe
+```
+
+The test verifies all SDK payload hashes and runs a compiled native writer →
+JSON-RPC String envelope → JavaScript parse → public `callWith` on both Wasm
+profiles. Independent Lean observations cover every Manual metadata field,
+exact numbers, recursive parts and checked NameMap construction. Rejection,
+recovery and disposal are checked as well. This does not exercise an editor
+connection, rendering, retained React state or performance.
+
+Native JSX uses the explicit `jsx%{…}` delimiter. The ordinary preview currently
+keeps its existing string decoder; generated-codec widget adoption is separate
+from the typed document gate above.
+
+The opt-in `VersoCast.Manual.Codec` module supplies
+`VersoCast.Manual.Codec.encodeDocument : Part Manual → String` and registers the
+checked `NameMap String` construction rule. It uses public insertion/iteration
+operations, preserves Name components, rejects invalid keys and keeps the last
+value for duplicate keys. Import it in the writer and typed-entry modules;
+select `argumentRepresentation: "json-safe-v1"` in the receiving public
+`callWith`. Its format is tied to the matched VIR compiler/runtime, not Verso's
+`ToJson` schema or a stable document interchange format. It is not imported by
+the core renderer or the ordinary Manual adapter.
+
 ## Lean reference manual validation
 
 The setup helper creates a pinned copy under `.local/reference-manual`, adds
 the test widget to document pages and shares Cast's checked dependency revisions.
 Its source pin is defined in [the helper](../tools/setup-reference-manual.mjs).
-It preserves page edits and refuses to overwrite edited configuration or helper
-files. First setup needs network access.
+It preserves page edits and preflights configuration and helper edits before
+applying a managed refresh. First setup needs network access.
 
 For an editor preview:
 
@@ -141,6 +180,7 @@ For the automated replay:
 
 ```sh
 npm run test:reference-manual
+npm run test:preview-server
 ```
 
 This prepares the copy, builds the widget and six pages, and checks live/SSR
@@ -151,13 +191,31 @@ React `act` drains test updates; stale-reply checks require a held request to be
 aborted on a page switch and delivered before checking the current page.
 Edits in this replay change serialized input, not the saved Manual source.
 
+The public headless hook is exercised with host-owned abort signals and replacement
+sessions. It preserves the exact native RPC reference and captured session;
+tests observe committed React state, not a precommit publication callback.
+The separate server test launches a genuine Lean LSP process with unsaved edits:
+it checks reference round-trips, a stable header RPC anchor, version guards,
+error-page preview versus execution admission, and a real same-version close/open
+worker replacement retiring the old session. The demo's native editor wrapper
+maps edits, progress and server lifecycle events to selection invalidation.
+Actual VS Code lifecycle and runnable-control shutdown remain consumer acceptance
+gates; do not infer them from a controlled browser transport.
+
+The same pages also pass through the generated native writer, a controlled
+JSON-RPC String envelope, JavaScript parsing and public typed `callWith`.
+Their React SSR output must equal that from the existing decoder; Chromium
+checks live output and retained disclosure DOM after typed reconstruction.
+This direct-call gate is separate from the all-Lean widget, which still uses
+its existing decoder pending a public VIR client-side codec connection.
+
 The consumer adapter renders examples, proof states, grammar, attributes,
 syntax-kind labels and TODO notes. It is a raw-document preview: references,
 citations and generated license/index data can remain visible fallbacks.
 Math is source-only and hover information is not interactive. Browser tests
 stage the sample images; VS Code asset-URL mapping is not implemented.
-Debug enables inspection metadata, not timings. The test codec uses Lean's JSON
-parser and is not a renderer performance baseline.
+Debug enables inspection metadata, not timings. Neither decoding path is a
+renderer performance baseline.
 
 Fixtures and the Lake patch live in [tests/reference-manual](../tests/reference-manual).
 Changes to captured renderer bodies must invalidate the widget package; its
@@ -176,10 +234,17 @@ responsibility:
   defines navigation addresses; `JsStrings.lean` caches native property strings.
 - `Manual.lean`, `Blog.lean` and `Highlighting.lean` implement genre adapters and
   shared token rendering. The optional Slides adapter lives in `packages/slides/`.
-- `js/katex.mjs` is the optional math component. `examples/` contains small
-  clients, `tests/` contains fixtures and acceptance checks, and `tools/` stages
-  and serves demos. `tools/comparison.mjs` prepares the shared comparison views;
-  tests add assertions and browser interaction separately.
+- `Manual/Preview.lean` and `Manual/Preview/Server.lean` are the opt-in checked-page
+  Lean bridge and server API. The core renderer and ordinary Manual adapter do
+  not import them. `Manual/Codec.lean` is independent of preview acquisition.
+- `js/preview.mjs` owns native React requests and cancellation, not document
+  decoding or rendering. `js/katex.mjs` is the optional native math component.
+- `tests/reference-manual/widget.mjs` maps Infoview events to selected pages;
+  `panel.mjs` supplies demo-only chrome. Other test `.mjs` files drive Node or
+  browser checks. `.mjs` denotes JavaScript ES modules, not another renderer.
+- `examples/` contains small clients; `tools/` stages and serves demos.
+  `tools/comparison.mjs` prepares the shared comparison views; tests add
+  assertions and browser interaction separately.
 
 Keep genre-specific editor behavior in consumers. New renderer behavior should
 have Lean or runtime tests as appropriate; stateful changes need retained React

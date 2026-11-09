@@ -42,11 +42,11 @@ private structure State where
     js#let (count, setter) ← Hooks.useState (α := Float) zero
     let click ← Js.Function.ofLeanVoid fun (_ : Js SyntheticEvent) =>
       Js.Function.callVoid setter (SetStateAction.ofUpdater increment)
-    return ← <div data-counter={← JsValue.ofString label}>
+    return ← jsx%{<div data-counter={← JsValue.ofString label}>
       <button onClick={click}>Increment {Node.text (← JsValue.ofString label)}</button>
       <output>{pure count}</output>
       {Props.WithData.children props}
-    </div>
+    </div>}
   let handlers : Renderer.Renderers Genre.Manual := {
     Manual.renderers with
     -- Rendering uses the prepared typed state, not serialized content keys.
@@ -59,7 +59,7 @@ private structure State where
       let props ← Props.WithData.make (← LeanRef.toJSL label)
       let leaf ← Node.functionComponent counterView props (← Js.Array.ofArray (← children.render ()))
       let wrapper ← attributes "counter" styles.unsupported
-      return some (← <section @props={wrapper}>{pure leaf}</section>) }
+      return some (← jsx%{<section @props={wrapper}>{pure leaf}</section>}) }
   let first := document 0
   let initialState : State := {
     phase := 0
@@ -83,9 +83,9 @@ private structure State where
       Js.Function.callVoid setter (SetStateAction.ofUpdater advance)
     let rendered ← Renderer.render styles state.document {
       fingerprint? := some (fun value => some (state.identities.key value)) } handlers
-    return ← <div data-phase={← JsValue.ofString (toString state.phase)}>
+    return ← jsx%{<div data-phase={← JsValue.ofString (toString state.phase)}>
       <button data-next="true" onClick={next}>Next document edit</button>
       {pure rendered}
-    </div>
+    </div>}
 
 end VersoCastTests.Retention

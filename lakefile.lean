@@ -2,9 +2,9 @@ import Lake
 open Lake DSL
 
 require verso from git "https://github.com/leanprover/verso" @
-  "01a09f320122475119588526857a07d218aef600"
+  "f7a4dc6867f8df27778b2b320763ec9e3b7be070"
 require lean_vir from git "https://github.com/ejgallego/lean-vir" @
-  "aa465b873387a0bf46669031da1af99f59b0f3b9"
+  "5a5614b802e1eb15607b885f84d11cbd8cd4fd21"
 
 package «verso-cast» where
   leanOptions := #[⟨`experimental.module, true⟩]
@@ -31,6 +31,11 @@ lean_exe «cast-standard-html» where
 lean_exe «cast-blog-html» where
   srcDir := "tests"
   root := `BlogComparison
+
+-- Native server-side writer fixture; no browser bindings enter its import graph.
+lean_exe «cast-codec-input» where
+  srcDir := "tests"
+  root := `JsonSafeInput
 
 -- Optional live example; the renderer library does not import Infoview.
 lean_lib VersoCastExamples where

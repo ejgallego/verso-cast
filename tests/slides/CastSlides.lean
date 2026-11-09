@@ -29,11 +29,11 @@ owns neither presentation navigation nor a second imperative DOM runtime. -/
       Js.Function.callVoid setter (SetStateAction.ofUpdater previous)
     let focus := if selected == 0 then none else some s!"part-root-part-{selected - 1}-heading"
     let node ← Renderer.render styles document { focus } handlers
-    return ← <div>
+    return ← jsx%{<div>
       <nav aria-label="Slide preview"><button onClick={movePrevious}>Previous</button>
         <output data-slide-selected={← JsValue.ofString (toString selected)}>
           {ProofWidgets.Html.text (if selected == 0 then "Whole deck" else s!"Slide {selected}")}</output>
         <button onClick={moveNext}>Next</button></nav>
-      {pure node}</div>
+      {pure node}</div>}
 
 end CastSlides

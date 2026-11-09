@@ -26,7 +26,8 @@ const output = resolve(root, "_out/reference-manual");
 await stageProgram("+CastManualPreview:vir", output, { cwd: manual });
 await copyFile(resolve(manual, ".cast-preview/widget.irpkg"), resolve(output, "widget.irpkg"));
 for (const { name } of pages)
-  await copyFile(resolve(manual, `.cast-preview/${name}.json`), resolve(output, `${name}.json`));
+  for (const suffix of ["json", "typed.json"])
+    await copyFile(resolve(manual, `.cast-preview/${name}.${suffix}`), resolve(output, `${name}.${suffix}`));
 // Original images referenced by the selected Monadic Syntax page. Keep their
 // published paths; do not fetch web assets or replace them with mock images.
 await mkdir(resolve(output, "static/screenshots"), { recursive: true });
@@ -38,6 +39,14 @@ try {
   for (const { name, module } of pages) {
     const input = await readFile(resolve(output, `${name}.json`), "utf8");
     const html = renderToStaticMarkup(runtime.call("CastManualPreview.renderDocument", input));
+    const typedInput = await readFile(resolve(output, `${name}.typed.json`), "utf8");
+    // Same actual server-side Part, generated writer and compiled renderer.
+    // Compare final HTML, not the intentionally different wire schemas.
+    const envelope = JSON.stringify({ jsonrpc: "2.0", id: 1, result: typedInput });
+    const typed = JSON.parse(JSON.parse(envelope).result);
+    const typedHtml = renderToStaticMarkup(runtime.callWith(
+      { argumentRepresentation: "json-safe-v1" }, "CastManualPreview.renderPart", typed));
+    assert.equal(typedHtml, html, `${module}: generated codec preserves rendered output`);
     staticPages.push(html);
     await writeFile(resolve(output, `${name}.ssr.html`), html);
     const extensions = {};
@@ -191,28 +200,29 @@ try {
   // Reset the edited fixture before comparing the original checked pages.
   await page.reload();
   await heading("Introduction").waitFor();
+  const comparePage = () => page.evaluate(() => {
+    const shape = node => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent || null;
+      if (node.nodeType !== Node.ELEMENT_NODE) return null;
+      const children = [];
+      for (const child of node.childNodes) {
+        const value = shape(child);
+        if (value === null) continue;
+        if (typeof value === "string" && typeof children.at(-1) === "string") children[children.length - 1] += value;
+        else children.push(value);
+      }
+      return [node.tagName, children];
+    };
+    const live = document.querySelector("#app article"), ssr = document.querySelector("#ssr article");
+    return { live: shape(live), ssr: shape(ssr),
+      fallbacks: [...live.querySelectorAll("code")].map(node => node.textContent)
+        .filter(text => /^\[(inline|block) extension:/.test(text)) };
+  });
   for (const [index, sample] of pages.entries()) {
     await page.evaluate(index => window.manualPreview.select(index), index);
     await heading(sample.title).waitFor();
     await page.evaluate(html => { document.getElementById("ssr").innerHTML = html; }, staticPages[index]);
-    const comparison = await page.evaluate(() => {
-      const shape = node => {
-        if (node.nodeType === Node.TEXT_NODE) return node.textContent || null;
-        if (node.nodeType !== Node.ELEMENT_NODE) return null;
-        const children = [];
-        for (const child of node.childNodes) {
-          const value = shape(child);
-          if (value === null) continue;
-          if (typeof value === "string" && typeof children.at(-1) === "string") children[children.length - 1] += value;
-          else children.push(value);
-        }
-        return [node.tagName, children];
-      };
-      const live = document.querySelector("#app article"), ssr = document.querySelector("#ssr article");
-      return { live: shape(live), ssr: shape(ssr),
-        fallbacks: [...live.querySelectorAll("code")].map(node => node.textContent)
-          .filter(text => /^\[(inline|block) extension:/.test(text)) };
-    });
+    const comparison = await comparePage();
     assert.deepEqual(comparison.live, comparison.ssr, `${sample.module}: live/SSR without parser repair`);
     inventory[index].fallbacks = comparison.fallbacks;
     for (const name of handledExtensions)
@@ -234,10 +244,58 @@ try {
     console.log(`${sample.module}: ${comparison.fallbacks.length} visible fallbacks; live/SSR PASS`);
     await page.screenshot({ path: resolve(output, `${sample.name}.png`), fullPage: true });
   }
+  await heading(pages.at(-1).title).waitFor();
+  assert.equal(await page.evaluate(() => window.manualPreview.referencePreserved), true,
+    "the ordinary RPC snapshot reference is retained by identity, not decoded or cloned");
+  assert.equal(await page.evaluate(() => window.manualPreview.sessionPreserved), true);
+  const beforeStable = await page.evaluate(() => window.manualPreview.calls);
+  await page.evaluate(() => window.manualPreview.renderPublic());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable,
+    "stable public inputs do not refetch on a parent/cursor-only render");
+  const beforeReplacement = await page.evaluate(() => window.manualPreview.lifecycle.length);
+  const sameVersion = await page.evaluate(() => window.manualPreview.loadedPage.version);
+  await page.evaluate(() => window.manualPreview.refreshPublic());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 1,
+    "a host-owned replacement selection triggers exactly one request");
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeReplacement),
+    ["invalidated", "committed"], "abort the old selection before committing a replacement");
+  assert.equal(await page.evaluate(() => window.manualPreview.loadedPage.version), sameVersion);
+  await page.evaluate(() => window.manualPreview.replaceSession());
+  assert.equal(await page.evaluate(() => window.manualPreview.calls), beforeStable + 2);
+  assert.equal(await page.evaluate(() => window.manualPreview.referencePreserved), true);
+  assert.equal(await page.evaluate(() => window.manualPreview.sessionPreserved), true,
+    "a newly accepted reference retains its own session, not the previous or a cursor session");
+  const beforeEdit = await page.evaluate(() => window.manualPreview.lifecycle.length);
+  await page.evaluate(() => window.manualPreview.hold(true));
+  await page.evaluate(() => window.manualPreview.edit());
+  await page.locator('[data-cast-preview-current="false"]').waitFor();
+  await heading(pages.at(-1).title).waitFor();
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit), ["invalidated"]);
+  await page.evaluate(() => { window.manualPreview.hold(false); return window.manualPreview.release(); });
+  assert.deepEqual(await page.evaluate(n => window.manualPreview.lifecycle.slice(n), beforeEdit),
+    ["invalidated", "committed"], "source edit cancellation invalidates once, before the reply");
+  await page.locator('[data-cast-preview-current="true"]').waitFor();
+  // The generated path constructs Part directly through the public typed call.
+  // Keep it separate from the retained widget's controlled RPC lifecycle gate.
+  for (const [index, sample] of pages.entries()) {
+    await page.evaluate(index => window.manualPreview.renderTyped(index), index);
+    await heading(sample.title).waitFor();
+    await page.evaluate(html => { document.getElementById("ssr").innerHTML = html; }, staticPages[index]);
+    const comparison = await comparePage();
+    assert.deepEqual(comparison.live, comparison.ssr, `${sample.module}: generated codec live/SSR`);
+    console.log(`${sample.module}: generated writer → typed Part → live React/SSR PASS`);
+  }
+  await page.evaluate(() => window.manualPreview.renderTyped(0));
+  await example.locator("summary").click();
+  await example.evaluate(node => { window.typedExample = node; });
+  await page.evaluate(() => window.manualPreview.renderTyped(0));
+  assert.equal(await example.evaluate(node => node === window.typedExample && node.open), true,
+    "reconstructing the same typed document retains the disclosure and DOM");
   await writeFile(resolve(output, "coverage.json"), JSON.stringify(inventory, null, 2) + "\n");
   await page.evaluate(() => window.manualPreview.dispose());
   assert.equal(await page.locator("#app").textContent(), "");
-  assert.equal(await page.evaluate(() => window.manualPreview.subscriptions), 0);
+  assert.equal(await page.evaluate(() => window.manualPreview.activeRequest), false);
+  await assert.rejects(page.evaluate(() => window.manualPreview.renderTyped(0)), /disposed/i);
   assert.deepEqual(errors, []);
   console.log("Real Manual pages / Chromium: decode, render, switching, refresh, stale/error recovery and disposal PASS");
 } finally {
